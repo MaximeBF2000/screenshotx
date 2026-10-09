@@ -79,6 +79,8 @@ fn ensure_overlay(app: &AppHandle, d: &Display) -> Result<tauri::WebviewWindow> 
     let label = overlay_label(d.id);
     if let Some(w) = app.get_webview_window(&label) {
         macos::set_frame_cg(app, &w, d.x, d.y, d.width, d.height);
+        // above the menu bar, so the selection can start at the very top
+        windows::set_level(app, &label, macos::Level::Overlay);
         return Ok(w);
     }
     let mut spec = Spec::new(&label, "overlay");
@@ -121,12 +123,15 @@ pub fn start(app: &AppHandle, mode: Mode, opts: StartOpts) {
             crate::toast::show(&app, "error", "Capture failed", &format!("{e}"));
             *state::state().session.lock() = None;
             crate::hotkeys::end_session_keys(&app, "overlay");
+            crate::quick_access::relayout(&app);
         }
     });
 }
 
 fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
     log::info!("capture start {mode:?}");
+    // Quick Access steps aside while selecting (comes back afterwards)
+    windows::hide(app, crate::quick_access::LABEL);
     let s = settings();
     let front = macos::frontmost_app();
     let hid_icons = s.hide_desktop_icons_while_capturing && !state::state().desktop_icons_hidden.load(Ordering::SeqCst);
@@ -140,7 +145,7 @@ fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
         .and_then(|f| all_windows.iter().find(|w| w.pid == f.pid && w.layer == 0))
         .map(|w| w.title.clone())
         .unwrap_or_default();
-    let pickable = sck::pickable_windows();
+    let pickable = sck::pickable_windows(&windows::capturable_own_windows(app, s.pins_show_on_screenshots));
 
     let content = sck::shareable_content()?;
     let exclude = windows::excluded_window_numbers(app, s.pins_show_on_screenshots);
@@ -271,6 +276,7 @@ pub fn snapshot_bmp(session_id: u64, display_id: u32) -> Option<Arc<Vec<u8>>> {
 
 fn hide_overlays(app: &AppHandle) {
     crate::hotkeys::end_session_keys(app, "overlay");
+    crate::quick_access::relayout(app);
     for d in displays::list() {
         let label = overlay_label(d.id);
         if let Some(w) = app.get_webview_window(&label) {

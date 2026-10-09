@@ -358,7 +358,8 @@ function Card({
             </>
           )}
         </div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+        {/* full-card layout box: click-through so it doesn't cover the corner buttons */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none">
           <PillBtn
             onClick={async () => {
               await act(item.id, "copy");
@@ -445,7 +446,7 @@ function PillBtn({ children, onClick, onContext }: { children: React.ReactNode; 
           onContext();
         }
       }}
-      className="h-[30px] w-[96px] rounded-full bg-white text-[#1d1d1f] text-[12.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/90 active:scale-[0.97] transition-transform shadow-md"
+      className="pointer-events-auto h-[30px] w-[96px] rounded-full bg-white text-[#1d1d1f] text-[12.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/90 active:scale-[0.97] transition-transform shadow-md"
     >
       {children}
     </button>

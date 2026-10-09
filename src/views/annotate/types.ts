@@ -112,6 +112,8 @@ export interface Background {
   value: string;
   padding: number;
   inset: number;
+  /** color of the inset band; empty = the screenshot's edge color */
+  insetColor?: string;
   autoBalance: boolean;
   shadow: number;
   radius: number;

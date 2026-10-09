@@ -341,7 +341,16 @@ export function AnnotateCanvas() {
         }
       } else if (o.type === "text") {
         const b = bounds(o);
-        if (d.handle === "e") n = { ...o, width: Math.max(40, p.x - o.x) };
+        if (d.handle.length === 2) {
+          // corner: scale the text around the opposite corner
+          const ax = d.handle.includes("w") ? b.x + b.w : b.x;
+          const ay = d.handle.includes("n") ? b.y + b.h : b.y;
+          const k = Math.max(0.1, (Math.abs(p.x - ax) / b.w + Math.abs(p.y - ay) / b.h) / 2);
+          const fontSize = Math.max(6, Math.min(400, o.fontSize * k));
+          const scaled = { ...o, fontSize, width: o.width ? o.width * (fontSize / o.fontSize) : 0 };
+          const nb = bounds(scaled);
+          n = { ...scaled, x: d.handle.includes("w") ? ax - nb.w : ax, y: d.handle.includes("n") ? ay - nb.h : ay };
+        } else if (d.handle === "e") n = { ...o, width: Math.max(40, p.x - o.x) };
         else n = { ...o, x: Math.min(p.x, b.x + b.w - 40), width: Math.max(40, b.x + b.w - p.x) };
       } else if ("w" in o) {
         const ratio = e.shiftKey || o.type === "image" ? Math.abs(o.w / o.h) || 1 : null;

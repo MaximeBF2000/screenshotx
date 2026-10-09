@@ -210,8 +210,14 @@ pub struct WinInfo {
     pub alpha: f64,
 }
 
-/// On-screen windows, front to back.
+/// On-screen windows, front to back (other apps only).
 pub fn window_list() -> Vec<WinInfo> {
+    window_list_allowing(&[])
+}
+
+/// On-screen windows, front to back, including our own windows listed in
+/// `own_allowed` (editors, Settings...).
+pub fn window_list_allowing(own_allowed: &[u32]) -> Vec<WinInfo> {
     let opts = CGWindowListOption::OptionOnScreenOnly | CGWindowListOption::ExcludeDesktopElements;
     let Some(arr) = CGWindowListCopyWindowInfo(opts, 0) else { return vec![] };
     // CFArray<CFDictionary> is toll-free bridged with NSArray<NSDictionary>
@@ -249,7 +255,7 @@ pub fn window_list() -> Vec<WinInfo> {
             height: num(&b, "Height"),
             alpha: num(&d, "kCGWindowAlpha"),
         };
-        if info.pid == own_pid || info.alpha <= 0.01 || info.width < 8.0 || info.height < 8.0 {
+        if (info.pid == own_pid && !own_allowed.contains(&info.id)) || info.alpha <= 0.01 || info.width < 8.0 || info.height < 8.0 {
             continue;
         }
         out.push(info);
@@ -259,8 +265,8 @@ pub fn window_list() -> Vec<WinInfo> {
 
 /// Windows a user can pick in window-capture mode (normal app windows plus
 /// floating panels, menus excluded).
-pub fn pickable_windows() -> Vec<WinInfo> {
-    let all: Vec<WinInfo> = window_list()
+pub fn pickable_windows(own_allowed: &[u32]) -> Vec<WinInfo> {
+    let all: Vec<WinInfo> = window_list_allowing(own_allowed)
         .into_iter()
         .filter(|w| {
             (0..=8).contains(&w.layer)

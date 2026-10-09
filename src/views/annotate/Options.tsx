@@ -68,7 +68,7 @@ function TextStylePicker() {
         <TextStylePreview style={ts.textStyle} color={ts.color} width={84} height={20} />
         <ChevronDown size={12} className="text-[var(--text-2)]" />
       </button>
-      <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="w-[210px]">
+      <Popover anchor={pop.anchor} open={pop.open} onClose={pop.close} className="w-[272px]">
         {TEXT_STYLES.map((name, i) => (
           <button
             key={name}
@@ -79,7 +79,7 @@ function TextStylePicker() {
             className={clsx("w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--hover)]", ts.textStyle === i && "bg-[color-mix(in_srgb,var(--accent)_14%,transparent)]")}
           >
             <TextStylePreview style={i} color={ts.color} width={120} height={30} />
-            <span className="text-[11.5px] text-[var(--text-2)]">{name}</span>
+            <span className="text-[11.5px] text-[var(--text-2)] whitespace-nowrap">{name}</span>
           </button>
         ))}
       </Popover>

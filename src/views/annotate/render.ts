@@ -362,9 +362,7 @@ function drawPath(ctx: CanvasRenderingContext2D, o: PathObj, env: Env) {
   ctx.lineJoin = "round";
   ctx.strokeStyle = o.color;
   if (o.type === "highlighter") {
-    ctx.globalCompositeOperation = "multiply";
-    // opacity comes from the color itself (#RRGGBBAA); legacy #RRGGBB gets 50%
-    if (o.color.length === 7) ctx.globalAlpha = 0.5;
+    // opacity comes from the color itself (#RRGGBBAA, or #RRGGBB at 100%)
     ctx.lineCap = "butt";
     ctx.lineWidth = o.size;
   } else {
@@ -454,8 +452,6 @@ function drawBox(ctx: CanvasRenderingContext2D, o: BoxObj, env: Env) {
     if (o.fill) ctx.fill();
     else ctx.stroke();
   } else if (o.type === "highlightRect") {
-    ctx.globalCompositeOperation = "multiply";
-    if (o.color.length === 7) ctx.globalAlpha = 0.5;
     ctx.fillStyle = o.color;
     ctx.fillRect(o.x, o.y, o.w, o.h);
   }
@@ -688,7 +684,7 @@ export function renderDoc(ctx: CanvasRenderingContext2D, doc: Doc, env: Env, k: 
     ctx.clip();
     const inset = L.cw - c.w > 0.5 || L.ch - c.h > 0.5;
     if (inset) {
-      ctx.fillStyle = env.balance?.color ?? "#fff";
+      ctx.fillStyle = bg.insetColor || env.balance?.color || "#fff";
       ctx.fillRect(L.cx, L.cy, L.cw, L.ch);
       // concentric corner radius for the image inside the inset
       const ir = Math.max(r * 0.5, r - Math.min(L.ox - L.cx, L.oy - L.cy));

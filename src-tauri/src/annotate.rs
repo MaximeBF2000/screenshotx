@@ -25,13 +25,14 @@ pub fn open(app: &AppHandle, path: &str, capture_id: Option<String>) {
     };
     let d = displays::under_mouse();
     let (_, _, vw, vh) = macos::visible_frame(app, d.id).unwrap_or((d.x, d.y, d.width, d.height));
-    let chrome_w = 80.0;
-    let chrome_h = 150.0;
+    // toolbars + ~40pt of breathing room around the image on every side
+    let chrome_w = 160.0;
+    let chrome_h = 230.0;
     let mut w = iw / scale + chrome_w;
     let mut h = ih / scale + chrome_h;
-    let r = ((vw * 0.86) / w).min((vh * 0.86) / h).min(1.0);
-    w = (w * r).max(860.0);
-    h = (h * r).max(560.0);
+    let r = ((vw * 0.9) / w).min((vh * 0.9) / h).min(1.0);
+    w = (w * r).max(940.0).min(vw);
+    h = (h * r).max(640.0).min(vh);
     let label = format!("annotate-{}", state::new_id());
     let mut spec = Spec::new(&label, "annotate");
     spec.title = "Annotate";

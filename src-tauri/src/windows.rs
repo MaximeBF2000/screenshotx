@@ -169,6 +169,9 @@ pub fn create(app: &AppHandle, spec: Spec) -> tauri::Result<WebviewWindow> {
                 if let Err(e) = panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().value()) {
                     log::error!("panel style mask failed: {e}");
                 }
+                // setFloatingPanel: resets the level to NSFloatingWindowLevel (3,
+                // below the menu bar), so it must come before set_level
+                panel.set_floating_panel(true);
                 panel.set_level(macos::level_value(level) as i64);
                 let mut cb = CollectionBehavior::new().can_join_all_spaces().full_screen_auxiliary().ignores_cycle();
                 if matches!(level, Level::Overlay) {
@@ -178,7 +181,6 @@ pub fn create(app: &AppHandle, spec: Spec) -> tauri::Result<WebviewWindow> {
                 panel.set_hides_on_deactivate(false);
                 panel.set_has_shadow(shadow);
                 panel.set_opaque(false);
-                panel.set_floating_panel(true);
                 panel.set_works_when_modal(true);
                 panel.set_accepts_mouse_moved_events(true);
                 if click_through {
@@ -332,11 +334,20 @@ pub fn is_visible(app: &AppHandle, label: &str) -> bool {
 }
 
 /// Window numbers of our windows that must never appear in captures.
+/// Capture UI (selection overlays, Quick Access, toasts, recording
+/// controls...) is never captured; editors, Settings, History etc. are.
+fn is_capture_ui(label: &str) -> bool {
+    label.starts_with("overlay-")
+        || label.starts_with("recframe-")
+        || label.starts_with("renderer-")
+        || matches!(label, "quickaccess" | "toast" | "countdown" | "recctl" | "scrollprev")
+}
+
 pub fn excluded_window_numbers(app: &AppHandle, include_pins: bool) -> Vec<u32> {
     let mut out = vec![];
     for (label, w) in app.webview_windows() {
-        let keep_visible = label.starts_with("recfx-") || label == "camera" || (include_pins && label.starts_with("pin-"));
-        if keep_visible {
+        let exclude = is_capture_ui(&label) || (!include_pins && label.starts_with("pin-"));
+        if !exclude {
             continue;
         }
         if let Some(n) = macos::window_number(&w) {
@@ -344,6 +355,15 @@ pub fn excluded_window_numbers(app: &AppHandle, include_pins: bool) -> Vec<u32> 
         }
     }
     out
+}
+
+/// Our own windows that can be picked in window-capture mode.
+pub fn capturable_own_windows(app: &AppHandle, include_pins: bool) -> Vec<u32> {
+    app.webview_windows()
+        .into_iter()
+        .filter(|(label, _)| !is_capture_ui(label) && (include_pins || !label.starts_with("pin-")) && !label.starts_with("recfx-") && label != "camera")
+        .filter_map(|(_, w)| macos::window_number(&w))
+        .collect()
 }
 
 /// Simple centered regular window (preferences, history, onboarding...).

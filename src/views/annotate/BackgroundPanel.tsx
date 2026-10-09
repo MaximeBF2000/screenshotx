@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ImagePlus, Monitor, Plus, Save, Trash2, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "../../lib/ipc";
 import { useSettings } from "../../lib/settings";
-import { Checkbox, Slider, Switch } from "../../components/ui";
+import { Checkbox, Popover, Slider, Switch, usePopover } from "../../components/ui";
+import { ColorPicker, swatchStyle } from "../../components/ColorPicker";
 import { useAnnotate } from "./store";
 import { gradientById } from "./render";
 import { loadBitmap } from "./images";
-import { ASPECT_RATIOS, GRADIENTS, uid, type Align, type Background, type BgPreset } from "./types";
+import { ASPECT_RATIOS, COLORS, GRADIENTS, uid, type Align, type Background, type BgPreset } from "./types";
 
 function gradCss(id: string) {
   const g = gradientById(id);
@@ -43,6 +44,7 @@ export function BackgroundPanel() {
   const [current, setCurrent] = useState<string>(settings?.annotateLast?.bgPreset ?? "");
   const [naming, setNaming] = useState<string | null>(null);
   const [live, setLive] = useState<Partial<Background>>({});
+  const liveStarted = useRef(false);
 
   useEffect(() => {
     ensureBackgroundImage(bg);
@@ -51,13 +53,17 @@ export function BackgroundPanel() {
   const set = (patch: Partial<Background>) => st.setBackground({ enabled: true, ...patch });
   // sliders update live without flooding the undo history
   const liveSet = (patch: Partial<Background>) => {
+    // one undo step per drag: snapshot the state before the first change
+    if (!liveStarted.current) {
+      liveStarted.current = true;
+      st.pushHistory();
+    }
     setLive((l) => ({ ...l, ...patch }));
     const d = useAnnotate.getState().doc!;
     st.setDocLive({ ...d, background: { ...d.background, enabled: true, ...patch } });
   };
   const commitLive = () => {
-    if (!Object.keys(live).length) return;
-    st.pushHistory();
+    liveStarted.current = false;
     setLive({});
   };
 
@@ -220,8 +226,9 @@ export function BackgroundPanel() {
         ).map(([label, key, min, max]) => (
           <div key={key} className="flex items-center gap-3">
             <span className="w-14 text-[var(--text-2)]">{label}</span>
-            <Slider value={(live as any)[key] ?? (bg as any)[key]} min={min} max={max} width={150} onChange={(v) => liveSet({ [key]: v } as any)} onCommit={commitLive} />
+            <Slider value={(live as any)[key] ?? (bg as any)[key]} min={min} max={max} width={128} onChange={(v) => liveSet({ [key]: v } as any)} onCommit={commitLive} />
             <span className="w-7 text-right tabular-nums text-[11.5px] text-[var(--text-2)]">{Math.round((live as any)[key] ?? (bg as any)[key])}</span>
+            {key === "inset" ? <InsetColor /> : <span className="w-[18px] shrink-0" />}
           </div>
         ))}
         <Checkbox checked={bg.autoBalance} onChange={(v) => set({ autoBalance: v })} label="Auto balance" hint="Adjusts the space around the content so it looks evenly centered." />
@@ -256,5 +263,57 @@ export function BackgroundPanel() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** Swatch next to the Inset slider: Auto (the screenshot's edge color) or a custom color. */
+function InsetColor() {
+  const st = useAnnotate();
+  const bg = st.doc!.background;
+  const pop = usePopover();
+  const settings = useSettings((s) => s.settings);
+  const favorites: string[] = settings?.favoriteColors ?? [];
+  const auto = !bg.insetColor;
+  const started = useRef(false);
+  const apply = (insetColor: string) => {
+    if (!started.current) {
+      started.current = true;
+      st.pushHistory();
+    }
+    const d = useAnnotate.getState().doc!;
+    st.setDocLive({ ...d, background: { ...d.background, insetColor } });
+  };
+  const close = () => {
+    started.current = false;
+    pop.close();
+  };
+  return (
+    <>
+      <button
+        title={auto ? "Inset color: Auto (matches the screenshot's edges)" : "Inset color"}
+        onClick={pop.open ? close : pop.toggle}
+        className="w-[18px] h-[18px] shrink-0 rounded-full border border-black/15 flex items-center justify-center text-[8px] font-semibold text-[var(--text-2)]"
+        style={auto ? { background: "conic-gradient(#ff3b30, #ffcc00, #34c759, #007aff, #af52de, #ff3b30)" } : { ...swatchStyle(bg.insetColor!), boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.35)" }}
+      />
+      <Popover anchor={pop.anchor} open={pop.open} onClose={close}>
+        <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
+          <span className="text-[12px] font-medium">Inset color</span>
+          <button
+            onClick={() => apply("")}
+            className={clsx("h-[22px] px-2 rounded-md text-[11.5px] border", auto ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "border-[var(--control-border)] hover:bg-[var(--hover)]")}
+          >
+            Auto
+          </button>
+        </div>
+        <ColorPicker
+          key={auto ? "auto" : "custom"}
+          value={bg.insetColor || "#FFFFFF"}
+          onChange={apply}
+          presets={COLORS.filter((c) => c.value !== "transparent")}
+          favorites={favorites}
+          onFavorites={(f) => useSettings.getState().set({ favoriteColors: f })}
+        />
+      </Popover>
+    </>
   );
 }

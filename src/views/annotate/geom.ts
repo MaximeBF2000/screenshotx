@@ -22,8 +22,8 @@ export function bounds(o: Obj): Box {
   switch (o.type) {
     case "line":
     case "arrow": {
-      const pts = [{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }];
-      if (o.type === "arrow" && o.style === "curved") pts.push(curveControl(o));
+      // the control point lies off the curve: bound the curve itself
+      const pts = o.type === "arrow" && o.style === "curved" ? quadPoints(o) : [{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }];
       const xs = pts.map((p) => p.x);
       const ys = pts.map((p) => p.y);
       const pad = o.size + (o.type === "arrow" ? 10 : 0);
@@ -204,7 +204,16 @@ export function handles(o: Obj): { id: HandleId; x: number; y: number }[] {
   }
   if (o.type === "pen" || o.type === "highlighter" || o.type === "counter") return [];
   const b = o.type === "text" ? bounds(o) : norm(o as Box);
-  if (o.type === "text") return [{ id: "e", x: b.x + b.w, y: b.y + b.h / 2 }, { id: "w", x: b.x, y: b.y + b.h / 2 }];
+  if (o.type === "text")
+    // corners scale the text, sides set the wrap width
+    return [
+      { id: "nw", x: b.x, y: b.y },
+      { id: "ne", x: b.x + b.w, y: b.y },
+      { id: "se", x: b.x + b.w, y: b.y + b.h },
+      { id: "sw", x: b.x, y: b.y + b.h },
+      { id: "e", x: b.x + b.w, y: b.y + b.h / 2 },
+      { id: "w", x: b.x, y: b.y + b.h / 2 },
+    ];
   return [
     { id: "nw", x: b.x, y: b.y },
     { id: "n", x: b.x + b.w / 2, y: b.y },

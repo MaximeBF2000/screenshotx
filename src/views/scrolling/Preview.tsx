@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDownToLine, Check, X } from "lucide-react";
 import { fileUrl, invoke, listenHere, params } from "../../lib/ipc";
+import { useKeys } from "../../lib/sessionKeys";
 
 /** Live preview of a scrolling capture, beside the captured area. */
 export default function Preview() {
@@ -11,16 +12,16 @@ export default function Preview() {
   useEffect(() => {
     invoke<[string, number, number, number] | null>("scroll_preview").then((p) => p && setImg({ path: p[0], w: p[1], h: p[2], t: p[3] }));
     const un = listenHere<[string, number, number, number]>("scroll:preview", ([path, w, h, t]) => setImg({ path, w, h, t }));
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") invoke("scroll_control", { action: "cancel" });
-      if (e.key === "Enter") invoke("scroll_control", { action: "finish" });
-    };
-    window.addEventListener("keydown", onKey);
     return () => {
       un.then((f) => f());
-      window.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  // Enter = Done, Esc = cancel (also grabbed natively while capturing)
+  useKeys((e) => {
+    if (e.key === "Escape") invoke("scroll_control", { action: "cancel" });
+    if (e.key === "Enter") invoke("scroll_control", { action: "finish" });
+  });
 
   useEffect(() => {
     const el = scroller.current;
