@@ -57,7 +57,6 @@ function defaultsForBrowser() {
     annotateSmoothDrawing: true,
     annotateDrawShadow: true,
     annotateShowColorNames: false,
-    annotateAutoExpandCanvas: true,
     annotateRememberBackgroundTool: true,
     annotateLast: {},
     backgroundPresets: [],

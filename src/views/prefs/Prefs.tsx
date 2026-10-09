@@ -723,9 +723,6 @@ function AnnotateTab() {
       <Row label="Colors">
         <Check k="annotateShowColorNames" label="Show color names" />
       </Row>
-      <Row label="Canvas">
-        <Check k="annotateAutoExpandCanvas" label="Automatically expand" hint="Ensures all annotations fit by dynamically resizing the canvas." />
-      </Row>
       <Row label="Window">
         <Check k="annotateAlwaysOnTop" label="Always on top" />
       </Row>

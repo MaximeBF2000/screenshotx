@@ -22,7 +22,7 @@ A macOS screenshot and screen-recording tool modeled on CleanShot X, built with
 - Auto-close (close, or save and close), ask for a name after each capture, file info, and Restore Last Capture.
 
 **Annotate**
-- Tools: crop (aspect ratios, edge snapping, expand the canvas), rectangle and ellipse (outline or filled; F toggles), line, arrow (standard, fancy, double, curved), text (7 styles, emoji), pixelate, secure or smooth blur, spotlight, counter (1, A, a, I, i), smoothed pencil, and highlighter (freehand or rectangle).
+- Tools: crop (aspect ratios, edge snapping, expand the canvas), rectangle and ellipse (outline or filled; F toggles), line, arrow (standard, fancy, double, curved), text (7 styles, emoji), pixelate, secure or smooth blur, spotlight (one shared, adjustable darkness), counter (1, A, a, I, i), smoothed pencil, and highlighter (freehand or rectangle).
 - Background tool: 20 gradients, desktop or blurred wallpaper, custom images, and plain colors. Adjust padding, inset (its color matches the screenshot's edges, or pick one), shadow and corners, with auto-balance, 3×3 alignment and aspect ratios. Presets can be applied automatically to every screenshot.
 - Editing: select, move, resize, ⌥-drag to duplicate, arrange, nudge with the arrow keys, undo/redo, zoom and pan.
 - Add images: from a new screenshot, a file, the clipboard, or drag & drop.

@@ -188,7 +188,6 @@ pub struct Settings {
     pub annotate_remember_background_tool: bool,
     pub annotate_draw_shadow: bool,
     pub annotate_show_color_names: bool,
-    pub annotate_auto_expand_canvas: bool,
     pub annotate_always_on_top: bool,
     /// "exportLocation" | "ask"
     pub annotate_save_behavior: String,
@@ -338,7 +337,6 @@ impl Default for Settings {
             annotate_remember_background_tool: true,
             annotate_draw_shadow: true,
             annotate_show_color_names: false,
-            annotate_auto_expand_canvas: true,
             annotate_always_on_top: false,
             annotate_save_behavior: "exportLocation".into(),
             annotate_copy_and_close: false,

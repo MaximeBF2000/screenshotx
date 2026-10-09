@@ -20,7 +20,7 @@ import { IconButton, Popover, Segmented, Slider, usePopover } from "../../compon
 import { ColorPicker, swatchStyle } from "../../components/ColorPicker";
 import { drawObject, measureText } from "./render";
 import { useAnnotate } from "./store";
-import { COLORS, COUNTER_STYLES, TEXT_STYLES, type ArrowStyle, type PixelateStyle, type TextObj, type Tool } from "./types";
+import { clampSpotlightDim, COLORS, COUNTER_STYLES, TEXT_STYLES, type ArrowStyle, type PixelateStyle, type TextObj, type Tool } from "./types";
 
 const SIZE_TOOLS: Tool[] = ["rect", "ellipse", "line", "arrow", "pen", "highlighter", "counter", "text"];
 const COLOR_TOOLS: Tool[] = ["rect", "ellipse", "line", "arrow", "text", "counter", "pen", "move"];
@@ -238,6 +238,8 @@ export function OptionsBar() {
           <IconButton title="Ellipse" active={ts.spotlightShape === "ellipse"} onClick={() => setTs({ spotlightShape: "ellipse" })}>
             <Circle size={15} />
           </IconButton>
+          <Sep />
+          <SpotlightDim />
         </>
       )}
       {effective === "highlighter" && (
@@ -394,5 +396,39 @@ function CropOptions() {
         Apply ↩
       </button>
     </div>
+  );
+}
+
+/** Darkness outside the spotlights: one value for the whole document. */
+function SpotlightDim() {
+  const { doc, ts, setTs, pushHistory, setDocLive } = useAnnotate();
+  const started = useRef(false);
+  const value = Math.round(clampSpotlightDim(doc?.spotlightDim ?? ts.spotlightDim) * 100);
+  return (
+    <>
+      <span className="text-[11.5px] text-[var(--text-2)] mr-1">Darkness</span>
+      <Slider
+        value={value}
+        min={15}
+        max={85}
+        width={90}
+        onChange={(v) => {
+          const d = useAnnotate.getState().doc;
+          if (!d) return;
+          // one undo step per drag
+          if (!started.current) {
+            started.current = true;
+            pushHistory();
+          }
+          setDocLive({ ...d, spotlightDim: v / 100 });
+        }}
+        onCommit={() => {
+          started.current = false;
+          const d = useAnnotate.getState().doc;
+          if (d?.spotlightDim !== undefined) setTs({ spotlightDim: d.spotlightDim });
+        }}
+      />
+      <span className="w-8 text-right tabular-nums text-[11.5px] text-[var(--text-2)]">{value}%</span>
+    </>
   );
 }

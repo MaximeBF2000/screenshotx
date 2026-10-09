@@ -1,5 +1,7 @@
 import {
   counterLabel,
+  clampSpotlightDim,
+  DEFAULT_SPOTLIGHT_DIM,
   GRADIENTS,
   type Background,
   type BoxObj,
@@ -561,7 +563,7 @@ function drawSpotlights(ctx: CanvasRenderingContext2D, doc: Doc, spots: BoxObj[]
   off.height = ctx.canvas.height;
   const o = off.getContext("2d")!;
   o.setTransform(m);
-  o.fillStyle = "rgba(0,0,0,0.55)";
+  o.fillStyle = `rgba(0,0,0,${clampSpotlightDim(doc.spotlightDim ?? DEFAULT_SPOTLIGHT_DIM)})`;
   o.fillRect(c.x, c.y, c.w, c.h);
   o.globalCompositeOperation = "destination-out";
   o.fillStyle = "#000";

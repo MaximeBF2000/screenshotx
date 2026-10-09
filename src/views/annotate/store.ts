@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { bounds, contentBounds, mapObj, translate, union } from "./geom";
+import { bounds, mapObj, translate, union } from "./geom";
 import { renderContent, type ImgSrc } from "./render";
 import {
   DEFAULT_TOOL_SETTINGS,
@@ -29,7 +29,6 @@ interface State {
   editingText: string | null;
   bgPanel: boolean;
   dirty: boolean;
-  autoExpand: boolean;
   clipboard: Obj[];
 
   init: (doc: Doc, images: Map<string, ImgSrc>) => void;
@@ -51,7 +50,6 @@ interface State {
   setZoom: (z: number, fit?: boolean) => void;
   setBackground: (patch: Partial<Background>) => void;
   setCanvas: (r: CanvasRect) => void;
-  expandToFit: () => void;
   transform: (kind: "rotateL" | "rotateR" | "flipH" | "flipV") => void;
   resize: (w: number, h: number) => void;
   flatten: () => void;
@@ -88,7 +86,6 @@ export const useAnnotate = create<State>((set, get) => ({
   editingText: null,
   bgPanel: false,
   dirty: false,
-  autoExpand: true,
   clipboard: [],
 
   init: (doc, images) => set({ doc, original: snapshot(doc), images, past: [], future: [], selected: [], dirty: false, imagesVersion: get().imagesVersion + 1 }),
@@ -159,8 +156,8 @@ export const useAnnotate = create<State>((set, get) => ({
   add: (o) => {
     const st = get();
     if (!st.doc) return;
-    st.commit({ ...st.doc, objects: [...st.doc.objects, o] });
-    if (get().autoExpand) get().expandToFit();
+    const spotlightDim = o.type === "spotlight" && st.doc.spotlightDim === undefined ? st.ts.spotlightDim : st.doc.spotlightDim;
+    st.commit({ ...st.doc, objects: [...st.doc.objects, o], spotlightDim });
   },
   update: (id, patch, history = true) => {
     const st = get();
@@ -240,19 +237,6 @@ export const useAnnotate = create<State>((set, get) => ({
     const st = get();
     if (!st.doc) return;
     st.commit({ ...st.doc, canvas: r });
-  },
-  expandToFit: () => {
-    const st = get();
-    // with a background, annotations may live in the padding without
-    // changing the layout
-    if (!st.doc || st.doc.background.enabled) return;
-    const cb = contentBounds(st.doc);
-    if (!cb) return;
-    const c = st.doc.canvas;
-    const u = union(c, { x: Math.floor(cb.x), y: Math.floor(cb.y), w: Math.ceil(cb.w), h: Math.ceil(cb.h) });
-    if (u.x < c.x || u.y < c.y || u.w > c.w || u.h > c.h) {
-      set({ doc: { ...st.doc, canvas: u } });
-    }
   },
   transform: (kind) => {
     const st = get();

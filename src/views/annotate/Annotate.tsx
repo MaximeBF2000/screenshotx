@@ -132,7 +132,6 @@ export default function Annotate() {
     useAnnotate.setState({
       ts: { ...DEFAULT_TOOL_SETTINGS, ...(last.ts ?? {}) },
       tool: last.tool === "filledRect" ? "rect" : last.tool && last.tool !== "crop" ? last.tool : "arrow",
-      autoExpand: settings.annotateAutoExpandCanvas ?? true,
     });
     const presets = settings.backgroundPresets ?? [];
     if (settings.annotateRememberBackgroundTool && last.bgOpen) {
@@ -275,14 +274,6 @@ export default function Annotate() {
         { label: "Flatten Annotations", enabled: !!st.doc?.objects.length, action: () => st.flatten() },
         { label: "Revert to Original", action: () => st.revert() },
         "separator",
-        {
-          label: "Automatically Expand Canvas",
-          checked: st.autoExpand,
-          action: () => {
-            useAnnotate.setState({ autoExpand: !st.autoExpand });
-            useSettings.getState().set({ annotateAutoExpandCanvas: !st.autoExpand });
-          },
-        },
         {
           label: "Always on Top",
           checked: !!s?.annotateAlwaysOnTop,
@@ -452,7 +443,7 @@ export default function Annotate() {
             e.preventDefault();
             actions.dragOut();
           }}
-          className="h-[28px] px-2 rounded-[7px] flex items-center gap-1 text-[12px] font-medium text-[var(--text-2)] hover:bg-[var(--hover)] cursor-grab"
+          className="h-[28px] px-2 shrink-0 whitespace-nowrap rounded-[7px] flex items-center gap-1 text-[12px] font-medium text-[var(--text-2)] hover:bg-[var(--hover)] cursor-grab"
         >
           <GripVertical size={14} /> Drag me
         </div>

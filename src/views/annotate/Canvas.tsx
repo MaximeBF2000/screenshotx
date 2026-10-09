@@ -416,15 +416,12 @@ export function AnnotateCanvas() {
       if (o.type === "pen") fin = { ...o, points: smoothPoints(o.points, smooth) };
       st.setDocLive({ ...cur, objects: cur.objects.map((x) => (x.id === o.id ? fin : x)) });
       st.select([o.id]);
-      if (s.autoExpand) s.expandToFit();
       return;
     }
     if (d.kind === "handle") {
       const o = cur.objects.find((x) => x.id === d.id);
       if (o && "w" in o) st.setDocLive({ ...cur, objects: cur.objects.map((x) => (x.id === o.id ? ({ ...o, ...norm(o as any) } as Obj) : x)) });
-      if (s.autoExpand) s.expandToFit();
     }
-    if (d.kind === "move" && s.autoExpand) s.expandToFit();
   };
 
   // ---------- overlays (selection handles, text editor, crop) ----------

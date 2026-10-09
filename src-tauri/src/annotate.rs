@@ -33,6 +33,8 @@ pub fn open(app: &AppHandle, path: &str, capture_id: Option<String>) {
     let r = ((vw * 0.9) / w).min((vh * 0.9) / h).min(1.0);
     w = (w * r).max(940.0).min(vw);
     h = (h * r).max(640.0).min(vh);
+    // landscape by default: at least 1.45:1 (room for the Background panel too)
+    w = w.max((h * 1.45).min(vw * 0.9));
     let label = format!("annotate-{}", state::new_id());
     let mut spec = Spec::new(&label, "annotate");
     spec.title = "Annotate";

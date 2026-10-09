@@ -138,7 +138,13 @@ export interface Doc {
   canvas: CanvasRect;
   objects: Obj[];
   background: Background;
+  /** how dark the area outside spotlights gets (0-1), shared by all spotlights */
+  spotlightDim?: number;
 }
+
+export const DEFAULT_SPOTLIGHT_DIM = 0.7;
+/** older documents may hold values outside the 15–85% range */
+export const clampSpotlightDim = (v: number) => Math.min(0.85, Math.max(0.15, v));
 
 export const DEFAULT_BACKGROUND: Background = {
   enabled: false,
@@ -266,6 +272,8 @@ export interface ToolSettings {
   pixelate: PixelateStyle;
   intensity: number;
   spotlightShape: Shape;
+  /** remembered darkness for new documents */
+  spotlightDim: number;
   highlightShape: "free" | "rect";
   counterStyle: CounterStyle;
   rectRadius: number;
@@ -284,6 +292,7 @@ export const DEFAULT_TOOL_SETTINGS: ToolSettings = {
   pixelate: "pixelate",
   intensity: 10,
   spotlightShape: "rect",
+  spotlightDim: 0.7,
   highlightShape: "free",
   counterStyle: "numbers",
   rectRadius: 4,

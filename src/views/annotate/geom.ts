@@ -1,5 +1,5 @@
 import { counterRadius, curveControl, measureText } from "./render";
-import type { BoxObj, Doc, LineObj, Obj, Pt } from "./types";
+import type { BoxObj, LineObj, Obj, Pt } from "./types";
 
 export interface Box {
   x: number;
@@ -251,11 +251,6 @@ export function snap45(a: Pt, b: Pt): Pt {
   const s = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   return { x: a.x + Math.cos(s) * len, y: a.y + Math.sin(s) * len };
-}
-
-export function contentBounds(doc: Doc): Box | null {
-  if (!doc.objects.length) return null;
-  return doc.objects.map(bounds).reduce(union);
 }
 
 /** Douglas–Peucker simplification + light averaging for pencil strokes. */
