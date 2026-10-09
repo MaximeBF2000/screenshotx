@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSCameraUsageDescription</key>
+  <string>Screenshot X uses the camera only to show your webcam while recording the screen.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Screenshot X uses the microphone only to record your voice during screen recordings.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>Screenshot X needs Screen Recording access to take screenshots and record your screen.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Screenshot X uses automation to toggle Do Not Disturb while recording.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Screenshot X Project</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.screenshotx.project</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Image</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.png</string>
+        <string>public.jpeg</string>
+        <string>public.heic</string>
+        <string>org.webmproject.webp</string>
+        <string>public.tiff</string>
+        <string>com.compuserve.gif</string>
+        <string>public.image</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Video</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.mpeg-4</string>
+        <string>com.apple.quicktime-movie</string>
+        <string>com.apple.m4v-video</string>
+        <string>public.movie</string>
+      </array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.screenshotx.project</string>
+      <key>UTTypeDescription</key>
+      <string>Screenshot X Project</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>public.content</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>screenshotx</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>
