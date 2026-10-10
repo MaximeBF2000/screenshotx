@@ -11,8 +11,8 @@ pub struct History {
     pub items: Vec<CaptureItem>,
 }
 
-fn index_path() -> std::path::PathBuf {
-    paths::config_dir().join("history.json")
+pub fn index_path() -> std::path::PathBuf {
+    paths::data_dir().join("history.json")
 }
 
 impl History {
@@ -120,6 +120,24 @@ pub fn prune(app: &AppHandle) {
         for e in rd.flatten() {
             let p = e.path().to_string_lossy().to_string();
             if in_use.contains(&p) || pinned.contains(&p) {
+                continue;
+            }
+            if e.metadata().and_then(|m| m.modified()).map(|t| t < day_ago).unwrap_or(false) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
+    // thumbnails nothing refers to anymore (history off, entries removed)
+    let thumbs: Vec<String> = {
+        let st = state::state();
+        let h = st.history.lock();
+        let qa = st.qa_items.lock();
+        let closed = st.qa_closed.lock();
+        h.items.iter().chain(qa.iter()).chain(closed.iter()).map(|i| i.thumb.clone()).collect()
+    };
+    if let Ok(rd) = std::fs::read_dir(paths::thumbs_dir()) {
+        for e in rd.flatten() {
+            if thumbs.contains(&e.path().to_string_lossy().to_string()) {
                 continue;
             }
             if e.metadata().and_then(|m| m.modified()).map(|t| t < day_ago).unwrap_or(false) {

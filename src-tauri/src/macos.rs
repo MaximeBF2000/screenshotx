@@ -273,6 +273,13 @@ pub fn reveal_in_finder(path: &str) {
     NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&arr);
 }
 
+/// Move a file to the Trash (recoverable), like Finder's "Move to Trash".
+pub fn move_to_trash(path: &str) -> bool {
+    let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+    let res = objc2_foundation::NSFileManager::defaultManager().trashItemAtURL_resultingItemURL_error(&url, None);
+    res.is_ok()
+}
+
 pub fn open_url(url: &str) {
     if let Some(u) = NSURL::URLWithString(&NSString::from_str(url)) {
         NSWorkspace::sharedWorkspace().openURL(&u);

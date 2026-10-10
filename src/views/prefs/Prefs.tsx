@@ -745,7 +745,7 @@ const TOKENS: [string, string][] = [
   ["{app}", "App name"], ["{window}", "Window title"], ["{random}", "Random characters"], ["{counter}", "Number"], ["{type}", "Capture type"],
 ];
 
-function previewName(p: string) {
+function previewName(p: string = "") {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const map: Record<string, string> = {
@@ -835,6 +835,7 @@ function Advanced() {
         </div>
         <Hint>Restore old files with "Capture History" from the menu bar.</Hint>
       </Row>
+      <StorageLocation />
       <Row label="URL scheme">
         <Checkbox checked={allow === true} onChange={(v) => setAllow(v)} label="Allow applications to control Screenshot X" hint={<>Automate captures with <code>screenshotx://</code> links (e.g. from Raycast, Alfred or Shortcuts).</>} />
       </Row>
@@ -900,5 +901,57 @@ screenshotx://open-settings?tab=shortcuts`}
         </code>
       </div>
     </div>
+  );
+}
+
+/** Data folder for captures, Capture History and thumbnails. */
+function StorageLocation() {
+  const [info, setInfo] = useState<{ current: string; default: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    invoke("storage_info").then(setInfo);
+  }, []);
+  const move = async (path: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      setInfo(await invoke("set_storage_location", { path }));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!info) return null;
+  const isDefault = info.current === info.default;
+  return (
+    <Row label="Storage location" top>
+      <div className="flex items-center gap-2">
+        <span className="truncate max-w-[300px] text-[12.5px] px-2 py-[3px] rounded-[6px] bg-[var(--control)] border border-[var(--control-border)]" title={info.current}>
+          {info.current.replace(/^\/Users\/[^/]+/, "~")}
+        </span>
+        <Button
+          small
+          disabled={busy}
+          onClick={async () => {
+            const p = await openDialog({ directory: true, canCreateDirectories: true, defaultPath: info.current });
+            if (typeof p === "string") move(p);
+          }}
+        >
+          {busy ? "Moving…" : "Choose…"}
+        </Button>
+        <Button small onClick={() => invoke("open_path", { path: info.current })}>
+          Open
+        </Button>
+        {!isDefault && (
+          <Button small disabled={busy} onClick={() => move("")}>
+            Reset
+          </Button>
+        )}
+      </div>
+      {error && <div className="text-[11.5px] text-[#FF453A] mt-1">{error}</div>}
+      <Hint>Where new captures, Capture History and thumbnails are kept. Existing files are moved when you change it. Settings always stay in the default folder.</Hint>
+    </Row>
   );
 }

@@ -28,7 +28,9 @@ pub fn set_settings(app: AppHandle, patch: serde_json::Value) -> CmdResult<Setti
     let before = settings();
     let mut v = serde_json::to_value(&before).map_err(err)?;
     merge(&mut v, patch);
-    let new: Settings = serde_json::from_value(v).map_err(err)?;
+    let mut new: Settings = serde_json::from_value(v).map_err(err)?;
+    // moving the data folder goes through set_storage_location (it moves files)
+    new.storage_location = before.storage_location.clone();
     state::update_settings(|s| *s = new.clone());
     apply_side_effects(&app, &before, &new);
     Ok(new)
@@ -803,4 +805,29 @@ pub fn drag_icon(path: String) -> String {
         }
         Err(_) => path,
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageInfo {
+    pub current: String,
+    pub default: String,
+}
+
+#[tauri::command]
+pub fn storage_info() -> StorageInfo {
+    StorageInfo {
+        current: crate::paths::data_dir().to_string_lossy().to_string(),
+        default: crate::paths::config_dir().to_string_lossy().to_string(),
+    }
+}
+
+/// Move captures & Capture History to `path` ("" = back to the default).
+#[tauri::command]
+pub async fn set_storage_location(app: AppHandle, path: String) -> CmdResult<StorageInfo> {
+    tauri::async_runtime::spawn_blocking(move || crate::storage::set_location(&app, &path))
+        .await
+        .map_err(err)?
+        .map_err(|e| format!("{e:#}"))?;
+    Ok(storage_info())
 }

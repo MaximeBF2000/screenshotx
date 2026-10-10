@@ -7,26 +7,41 @@ fn ensure(p: PathBuf) -> PathBuf {
     p
 }
 
+/// `~/Library/Application Support/com.screenshotx.app`: settings.json always
+/// lives here, and it is the default data folder.
 pub fn config_dir() -> PathBuf {
     ensure(dirs::config_dir().unwrap_or_else(std::env::temp_dir).join(BUNDLE_ID))
 }
 
+/// Custom data folder (Settings → Advanced → Storage location), if any.
+static DATA_ROOT: std::sync::RwLock<Option<PathBuf>> = std::sync::RwLock::new(None);
+
+/// Point the data folder at `location` ("" = the default).
+pub fn set_data_root(location: &str) {
+    let root = (!location.trim().is_empty()).then(|| expand_tilde(location.trim()));
+    *DATA_ROOT.write().unwrap() = root;
+}
+
+/// Captures, Capture History, thumbnails and the history index.
+pub fn data_dir() -> PathBuf {
+    match DATA_ROOT.read().unwrap().clone() {
+        Some(p) => ensure(p),
+        None => config_dir(),
+    }
+}
+
 /// Where fresh captures live until the user saves them somewhere.
 pub fn captures_dir() -> PathBuf {
-    ensure(config_dir().join("Captures"))
+    ensure(data_dir().join("Captures"))
 }
 
 /// Copies of every capture kept for Capture History.
 pub fn history_dir() -> PathBuf {
-    ensure(config_dir().join("History"))
+    ensure(data_dir().join("History"))
 }
 
 pub fn thumbs_dir() -> PathBuf {
-    ensure(config_dir().join("Thumbnails"))
-}
-
-pub fn backgrounds_dir() -> PathBuf {
-    ensure(config_dir().join("Backgrounds"))
+    ensure(data_dir().join("Thumbnails"))
 }
 
 pub fn temp_dir() -> PathBuf {

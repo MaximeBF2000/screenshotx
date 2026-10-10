@@ -312,7 +312,10 @@ pub fn action(app: &AppHandle, id: &str, action: &str, arg: Option<String>) -> R
             }
         }
         "delete" => {
-            let _ = std::fs::remove_file(&item.path);
+            if !crate::macos::move_to_trash(&item.path) {
+                log::warn!("move to trash failed, deleting {}", item.path);
+                let _ = std::fs::remove_file(&item.path);
+            }
             crate::history::remove(app, id);
             close(app, id, false);
         }

@@ -76,8 +76,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        let settings = Settings::load();
+        // before the history index is read from the data folder
+        crate::paths::set_data_root(&settings.storage_location);
         Self {
-            settings: RwLock::new(Settings::load()),
+            settings: RwLock::new(settings),
             session: Mutex::new(None),
             qa_items: Mutex::new(vec![]),
             qa_closed: Mutex::new(vec![]),

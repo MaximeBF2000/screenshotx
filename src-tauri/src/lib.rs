@@ -25,6 +25,7 @@ pub mod sck;
 pub mod scrolling;
 pub mod settings;
 pub mod state;
+pub mod storage;
 pub mod toast;
 pub mod tray;
 pub mod urlscheme;
@@ -255,6 +256,8 @@ pub fn run() {
             commands::scroll_control,
             commands::scroll_preview,
             commands::qa_replace,
+            commands::storage_info,
+            commands::set_storage_location,
             commands::pick_color,
             commands::drag_icon,
         ])

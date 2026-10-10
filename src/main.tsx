@@ -37,6 +37,13 @@ if (!isTauri && import.meta.env.DEV) {
   // Browser preview (dev only): minimal stand-ins for native commands.
   registerMock("image_info", () => [1400, 900, 1]);
   registerMock("export_dir", () => "/Users/me/Desktop");
+  const storageDefault = "/Users/me/Library/Application Support/com.screenshotx.app";
+  let storage = storageDefault;
+  registerMock("storage_info", () => ({ current: storage, default: storageDefault }));
+  registerMock("set_storage_location", (a) => {
+    storage = a.path || storageDefault;
+    return { current: storage, default: storageDefault };
+  });
   registerMock("new_file_stem", () => "Screenshot X 2026-01-01 at 10.00.00");
   const mode = params.get("mode") ?? "area";
   registerMock("overlay_payload", () => ({

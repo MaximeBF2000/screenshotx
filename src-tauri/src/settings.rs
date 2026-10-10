@@ -207,6 +207,8 @@ pub struct Settings {
     pub allow_url_scheme: Option<bool>,
     /// days, 0 = never keep
     pub history_days: u32,
+    /// data folder for captures & history; "" = ~/Library/Application Support/com.screenshotx.app
+    pub storage_location: String,
     pub dismissed_warnings: Vec<String>,
 
     // ---- State
@@ -352,6 +354,7 @@ impl Default for Settings {
             auto_increment: 1,
             allow_url_scheme: None,
             history_days: 30,
+            storage_location: String::new(),
             dismissed_warnings: vec![],
 
             onboarding_done: false,
