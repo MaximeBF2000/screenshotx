@@ -78,3 +78,11 @@ strip = false
 codegen-units = 4
 lto = "thin"
 opt-level = 3
+# same proc-macro dylib corruption as in dev (see above)
+strip = false
+
+[profile.release.package."*"]
+strip = false
+
+[profile.release.build-override]
+strip = false

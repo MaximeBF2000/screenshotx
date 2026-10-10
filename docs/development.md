@@ -82,8 +82,10 @@ Set `SX_NO_HOTKEYS=1` to start without registering global shortcuts.
 ## Pitfalls
 - **Single instance**: a built app exits right away while `pnpm tauri dev` is running.
 - **Build only through `tauri build`**: `cargo build` compiles a separate copy of every dependency.
-- **`strip = false`** stays in `Cargo.toml`: stripping corrupted the proc-macro libraries on this setup
-  ("can't find crate tauri_macros").
+- **`strip = false`** stays in every profile of `Cargo.toml` (dev and release, including `package."*"` and
+  `build-override`): stripping corrupts the proc-macro libraries with the current macOS linker ("mis-aligned
+  LINKEDIT string pool", "can't find crate"). If it happens anyway, delete `src-tauri/target/release` (or
+  `target/debug`) and build again.
 - **Signing**: keep the same identity between builds, or macOS asks for the permissions again (see the
   README).
 - **Panels**: call `set_floating_panel` before `set_level`. `setFloatingPanel:` resets the level to 3, below
