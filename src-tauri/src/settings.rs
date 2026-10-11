@@ -181,6 +181,11 @@ pub struct Settings {
     /// "ask" | "always" | "never"
     pub ocr_open_links: String,
     pub ocr_language: String,
+    /// "vision" (Apple Vision) | "ollama"
+    pub ocr_engine: String,
+    pub ocr_ollama_url: String,
+    pub ocr_ollama_model: String,
+    pub ocr_ollama_prompt: String,
 
     // ---- Annotate
     pub annotate_inverse_arrow: bool,
@@ -205,9 +210,10 @@ pub struct Settings {
     pub remove_illegal_chars: bool,
     pub auto_increment: u32,
     pub allow_url_scheme: Option<bool>,
-    /// days, 0 = never keep
-    pub history_days: u32,
-    /// data folder for captures & history; "" = ~/Library/Application Support/com.screenshotx.app
+    /// minutes a capture is kept once nothing uses it (Quick Access, pin, editor)
+    pub keep_images_minutes: u32,
+    pub keep_videos_minutes: u32,
+    /// data folder for captures & logs; "" = ~/Library/Application Support/Screenshot X
     pub storage_location: String,
     pub dismissed_warnings: Vec<String>,
 
@@ -333,6 +339,10 @@ impl Default for Settings {
             ocr_detect_links: true,
             ocr_open_links: "ask".into(),
             ocr_language: "auto".into(),
+            ocr_engine: "ollama".into(),
+            ocr_ollama_url: "http://localhost:11434".into(),
+            ocr_ollama_model: "glm-ocr".into(),
+            ocr_ollama_prompt: "Text Recognition:".into(),
 
             annotate_inverse_arrow: false,
             annotate_smooth_drawing: true,
@@ -353,7 +363,8 @@ impl Default for Settings {
             remove_illegal_chars: false,
             auto_increment: 1,
             allow_url_scheme: None,
-            history_days: 30,
+            keep_images_minutes: 5,
+            keep_videos_minutes: 5,
             storage_location: String::new(),
             dismissed_warnings: vec![],
 

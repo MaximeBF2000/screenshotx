@@ -687,11 +687,13 @@ function Screenshots() {
       </Row>
       <Divider />
       <Row label="Text recognition" top>
+        <OcrEngine />
         <Check k="ocrKeepLineBreaks" label="Keep line breaks" />
         <Check k="ocrDetectLinks" label="Detect links" />
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[12.5px]">Primary language</span>
           <Select value={s.ocrLanguage} onChange={(v) => set({ ocrLanguage: v })} width={180} options={[{ value: "auto", label: "Automatic" }, ...langs.map((l) => ({ value: l, label: l }))]} />
+          {s.ocrEngine === "ollama" && <span className="text-[11.5px] text-[var(--text-2)]">Apple Vision only</span>}
         </div>
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[12.5px]">Links</span>
@@ -758,11 +760,20 @@ function previewName(p: string = "") {
   return p.replace(/\{[A-Za-z]+\}/g, (t) => map[t] ?? t);
 }
 
+const KEEP_OPTIONS = [
+  { value: 1, label: "1 minute" },
+  { value: 5, label: "5 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+];
+
 function Advanced() {
   const [pattern, setPattern] = useS<string>("fileNamePattern");
   const [draft, setDraft] = useState(pattern);
   const [counter, setCounter] = useS<number>("autoIncrement");
-  const [days, setDays] = useS<number>("historyDays");
+  const [keepImages, setKeepImages] = useS<number>("keepImagesMinutes");
+  const [keepVideos, setKeepVideos] = useS<number>("keepVideosMinutes");
   const [allow, setAllow] = useS<boolean | null>("allowUrlScheme");
   const [perm, setPerm] = useState<{ screen: boolean; accessibility: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -815,25 +826,23 @@ function Advanced() {
         <Check k="pinsHideOnHoverWhenLocked" label="Fade locked pins on mouse over" hint="Hold ⌥ over a locked pin to interact with it." />
         <Check k="pinsShadow" label="Shadow" />
       </Row>
-      <Row label="Capture history">
-        <div className="flex items-center gap-2">
-          <Select
-            value={days}
-            onChange={setDays}
-            width={140}
-            options={[
-              { value: 0, label: "Never" },
-              { value: 1, label: "1 day" },
-              { value: 7, label: "1 week" },
-              { value: 30, label: "1 month" },
-              { value: 90, label: "3 months" },
-            ]}
-          />
+      <Row label="Keep captures" top>
+        <div className="flex items-center gap-2 text-[12.5px]">
+          <span className="w-[52px]">Images</span>
+          <Select value={keepImages} onChange={setKeepImages} width={140} options={KEEP_OPTIONS} />
+        </div>
+        <div className="flex items-center gap-2 text-[12.5px] mt-1.5">
+          <span className="w-[52px]">Videos</span>
+          <Select value={keepVideos} onChange={setKeepVideos} width={140} options={KEEP_OPTIONS} />
           <Button small onClick={() => invoke("cmd_open_history")}>
             Open History
           </Button>
         </div>
-        <Hint>Restore old files with "Capture History" from the menu bar.</Hint>
+        <Hint>
+          Captures are ephemeral. Once a capture leaves Quick Access (and isn't pinned or open in an editor), it is deleted after this
+          delay; until then you can restore it from Capture History. Quitting Screenshot X deletes every capture. Saved files are never
+          deleted.
+        </Hint>
       </Row>
       <StorageLocation />
       <Row label="URL scheme">
@@ -882,7 +891,7 @@ function About() {
         Screenshots, recordings, annotations, OCR, scrolling capture and pins — all local, all yours.
       </p>
       <div className="flex gap-2 mt-5">
-        <Button onClick={() => invoke("open_path", { path: `${"~"}/Library/Logs/Screenshot X` })}>Open Logs</Button>
+        <Button onClick={() => invoke("open_logs")}>Open Logs</Button>
         <Button onClick={() => invoke("cmd_open_history")}>Capture History</Button>
         <Button onClick={() => invoke("quit")}>Quit Screenshot X</Button>
       </div>
@@ -951,7 +960,92 @@ function StorageLocation() {
         )}
       </div>
       {error && <div className="text-[11.5px] text-[#FF453A] mt-1">{error}</div>}
-      <Hint>Where new captures, Capture History and thumbnails are kept. Existing files are moved when you change it. Settings always stay in the default folder.</Hint>
+      <Hint>Where captures (while they exist) and logs are kept. Existing files are moved when you change it. Settings always stay in the default folder.</Hint>
     </Row>
+  );
+}
+
+/** OCR engine: Apple Vision, or a model served by a local Ollama. */
+function OcrEngine() {
+  const s = useSettings((st) => st.settings)!;
+  const set = useSettings((st) => st.set);
+  const [status, setStatus] = useState<{ running: boolean; installed: boolean; error?: string } | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const [pullError, setPullError] = useState("");
+  const [url, setUrl] = useState(s.ocrOllamaUrl ?? "");
+  const [model, setModel] = useState(s.ocrOllamaModel ?? "");
+  const ollama = s.ocrEngine === "ollama";
+  const refresh = () => {
+    setStatus(null);
+    invoke("ocr_ollama_status").then(setStatus);
+  };
+  useEffect(() => {
+    if (ollama) refresh();
+  }, [ollama, s.ocrOllamaUrl, s.ocrOllamaModel]);
+  const field = "h-[24px] rounded-[6px] px-2 text-[12.5px] bg-[var(--control)] border border-[var(--control-border)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_45%,transparent)]";
+  return (
+    <div className="mb-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[12.5px] w-[52px]">Engine</span>
+        <Select
+          value={s.ocrEngine}
+          onChange={(v) => set({ ocrEngine: v })}
+          width={220}
+          options={[
+            { value: "ollama", label: "Ollama (local model)" },
+            { value: "vision", label: "Apple Vision" },
+          ]}
+        />
+      </div>
+      {ollama && (
+        <div className="mt-1.5 ml-[60px] space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[var(--text-2)] w-[44px]">Server</span>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} onBlur={() => set({ ocrOllamaUrl: url.trim() || "http://localhost:11434" })} className={`${field} w-[220px]`} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[var(--text-2)] w-[44px]">Model</span>
+            <input value={model} onChange={(e) => setModel(e.target.value)} onBlur={() => set({ ocrOllamaModel: model.trim() || "glm-ocr" })} className={`${field} w-[220px] font-mono`} />
+          </div>
+          <div className="flex items-center gap-2 text-[12px]">
+            {!status ? (
+              <span className="text-[var(--text-2)]">Checking Ollama…</span>
+            ) : !status.running ? (
+              <span className="text-[#FF9F0A]">Ollama isn't running. Start it, or captures use Apple Vision.</span>
+            ) : status.installed ? (
+              <span className="text-[#30D158]">Ready</span>
+            ) : (
+              <>
+                <span className="text-[#FF9F0A]">Model not downloaded.</span>
+                <Button
+                  small
+                  disabled={pulling}
+                  onClick={async () => {
+                    setPulling(true);
+                    setPullError("");
+                    try {
+                      await invoke("ocr_ollama_pull");
+                    } catch (e) {
+                      setPullError(String(e));
+                    }
+                    setPulling(false);
+                    refresh();
+                  }}
+                >
+                  {pulling ? "Downloading…" : "Download"}
+                </Button>
+              </>
+            )}
+            {status && !pulling && (
+              <button onClick={refresh} className="text-[var(--accent)] hover:underline">
+                Check again
+              </button>
+            )}
+          </div>
+          {pullError && <div className="text-[11.5px] text-[#FF453A]">{pullError}</div>}
+          <Hint>Uses {s.ocrOllamaModel || "glm-ocr"} through Ollama. If Ollama can't answer, text is recognized with Apple Vision instead. QR codes and barcodes always use Apple Vision.</Hint>
+        </div>
+      )}
+    </div>
   );
 }

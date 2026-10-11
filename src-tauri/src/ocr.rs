@@ -1,5 +1,11 @@
-//! On-device text recognition (Vision) + QR / barcode reading.
+//! Text recognition + QR / barcode reading.
+//!
+//! The text engine is pluggable (Settings → Screenshots → Text recognition):
+//! Apple Vision on device, or a model served by a local Ollama (GLM-OCR by
+//! default). To add one, implement [`Engine`] and return it from [`engine`].
+//! Barcodes are always read with Vision.
 
+use crate::settings::Settings;
 use crate::state::settings;
 use crate::toast::{self, Toast, ToastAction};
 use image::RgbaImage;
@@ -63,7 +69,61 @@ pub fn recognize(img: &RgbaImage, language: &str) -> OcrResult {
     recognize_level(img, language, VNRequestTextRecognitionLevel::Fast)
 }
 
+/// A text recognizer.
+pub trait Engine {
+    /// Shown in logs and in the fallback message.
+    fn name(&self) -> &'static str;
+    /// The text in `img`, lines separated by `\n` when `keep_line_breaks`.
+    fn text(&self, img: &RgbaImage, keep_line_breaks: bool) -> anyhow::Result<String>;
+}
+
+pub struct Vision {
+    pub language: String,
+}
+
+impl Engine for Vision {
+    fn name(&self) -> &'static str {
+        "Apple Vision"
+    }
+    fn text(&self, img: &RgbaImage, keep_line_breaks: bool) -> anyhow::Result<String> {
+        Ok(join(&recognize(img, &self.language).lines, keep_line_breaks))
+    }
+}
+
+pub struct Ollama {
+    pub url: String,
+    pub model: String,
+    pub prompt: String,
+}
+
+impl Engine for Ollama {
+    fn name(&self) -> &'static str {
+        "Ollama"
+    }
+    fn text(&self, img: &RgbaImage, keep_line_breaks: bool) -> anyhow::Result<String> {
+        let text = crate::ocr_ollama::recognize(&self.url, &self.model, &self.prompt, img)?;
+        Ok(if keep_line_breaks { text } else { text.split_whitespace().collect::<Vec<_>>().join(" ") })
+    }
+}
+
+/// The engine picked in Settings.
+pub fn engine(s: &Settings) -> Box<dyn Engine> {
+    match s.ocr_engine.as_str() {
+        "ollama" => Box::new(Ollama { url: s.ocr_ollama_url.clone(), model: s.ocr_ollama_model.clone(), prompt: s.ocr_ollama_prompt.clone() }),
+        _ => Box::new(Vision { language: s.ocr_language.clone() }),
+    }
+}
+
+/// QR codes and barcodes only.
+pub fn detect_codes(img: &RgbaImage) -> Vec<String> {
+    recognize_with(img, "", VNRequestTextRecognitionLevel::Fast, false).codes
+}
+
 fn recognize_level(img: &RgbaImage, language: &str, level: VNRequestTextRecognitionLevel) -> OcrResult {
+    recognize_with(img, language, level, true)
+}
+
+fn recognize_with(img: &RgbaImage, language: &str, level: VNRequestTextRecognitionLevel, with_text: bool) -> OcrResult {
     let Some(cg) = crate::nativeimage::rgba_to_cgimage(img) else { return OcrResult::default() };
     unsafe {
         let handler = VNImageRequestHandler::initWithCGImage_options(VNImageRequestHandler::alloc(), &cg, &NSDictionary::new());
@@ -77,16 +137,16 @@ fn recognize_level(img: &RgbaImage, language: &str, level: VNRequestTextRecognit
             text.setRecognitionLanguages(&langs);
         }
         let codes = VNDetectBarcodesRequest::new();
-        let reqs: Vec<Retained<VNRequest>> = vec![
-            Retained::into_super(Retained::into_super(text.clone())),
-            Retained::into_super(Retained::into_super(codes.clone())),
-        ];
+        let mut reqs: Vec<Retained<VNRequest>> = vec![Retained::into_super(Retained::into_super(codes.clone()))];
+        if with_text {
+            reqs.push(Retained::into_super(Retained::into_super(text.clone())));
+        }
         let arr = NSArray::from_retained_slice(&reqs);
         if handler.performRequests_error(&arr).is_err() {
             return OcrResult::default();
         }
         let mut out = OcrResult::default();
-        if let Some(results) = text.results() {
+        if let Some(results) = text.results().filter(|_| with_text) {
             for obs in results.iter() {
                 let cands = obs.topCandidates(1);
                 if let Some(c) = cands.firstObject() {
@@ -162,9 +222,23 @@ fn find_url(text: &str) -> Option<String> {
 pub fn run_and_copy(app: &AppHandle, img: &RgbaImage, keep_line_breaks: bool) {
     let s = settings();
     let t = std::time::Instant::now();
-    let res = recognize(img, &s.ocr_language);
-    log::info!("ocr: {} lines, {} codes in {:?}", res.lines.len(), res.codes.len(), t.elapsed());
-    let mut text = join(&res.lines, keep_line_breaks);
+    let eng = engine(&s);
+    if s.ocr_engine == "ollama" {
+        toast::show(app, "ocr", "Recognizing text…", "");
+    }
+    let mut fallback = None;
+    let mut text = match eng.text(img, keep_line_breaks) {
+        Ok(t) => t,
+        Err(e) => {
+            // e.g. Ollama not running or the model not downloaded
+            log::warn!("ocr: {} failed ({e:#}), using Apple Vision", eng.name());
+            fallback = Some(format!("{e}"));
+            Vision { language: s.ocr_language.clone() }.text(img, keep_line_breaks).unwrap_or_default()
+        }
+    };
+    let codes = detect_codes(img);
+    log::info!("ocr ({}): {} chars, {} codes in {:?}", eng.name(), text.len(), codes.len(), t.elapsed());
+    let res = OcrResult { lines: vec![], codes };
     if text.trim().is_empty() && !res.codes.is_empty() {
         text = res.codes.join("\n");
     } else if !res.codes.is_empty() {
@@ -179,7 +253,11 @@ pub fn run_and_copy(app: &AppHandle, img: &RgbaImage, keep_line_breaks: bool) {
     if s.play_sounds {
         crate::macos::play_sound(app, "ocr");
     }
-    let preview: String = text.chars().take(140).collect();
+    let preview: String = match &fallback {
+        // say why the configured engine wasn't used
+        Some(why) => format!("Used Apple Vision: {why}"),
+        None => text.chars().take(140).collect(),
+    };
     let url = if s.ocr_detect_links { find_url(&text) } else { None };
     match url {
         Some(u) if s.ocr_open_links == "always" => {

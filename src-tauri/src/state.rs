@@ -77,7 +77,6 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         let settings = Settings::load();
-        // before the history index is read from the data folder
         crate::paths::set_data_root(&settings.storage_location);
         Self {
             settings: RwLock::new(settings),
@@ -85,7 +84,7 @@ impl AppState {
             qa_items: Mutex::new(vec![]),
             qa_closed: Mutex::new(vec![]),
             qa_hidden: AtomicBool::new(false),
-            history: Mutex::new(crate::history::History::load()),
+            history: Mutex::new(crate::history::History::default()),
             recording: Mutex::new(None),
             scrolling: Mutex::new(None),
             prev_app: Mutex::new(None),

@@ -11,7 +11,7 @@ type Phase = "idle" | "drag" | "adjust" | "window";
 const displayId = Number(params.get("display"));
 
 const HINTS: Record<string, string> = {
-  allInOne: "Drag to select an area · Space for window · Enter for fullscreen",
+  allInOne: "Drag to select an area · Space to select the whole screen · Enter for fullscreen",
   record: "Drag to record a part of the screen · Space for window · Enter for fullscreen",
   scrolling: "Drag to capture the scrolling part of the screen.",
   ocr: "Drag to select the text you want to copy.",
@@ -40,8 +40,12 @@ export default function Overlay() {
 
   const W = p?.display.width ?? window.innerWidth;
   const H = p?.display.height ?? window.innerHeight;
-  // All-In-One switches to the recording setup bar before recording
-  const [modeOverride, setModeOverride] = useState<{ mode: "record"; kind: "video" | "gif" } | null>(null);
+  // All-In-One switches to the recording setup bar before recording; Space in
+  // Area mode switches to All-In-One with the whole screen selected
+  const [modeOverride, setModeOverride] = useState<{ mode: "record"; kind: "video" | "gif" } | { mode: "allInOne" } | null>(null);
+  const recordKind = modeOverride?.mode === "record" ? modeOverride.kind : undefined;
+  // Area mode turned into All-In-One with Space (Esc then behaves like All-In-One)
+  const aioFromSpace = useRef(false);
   const mode = modeOverride?.mode ?? p?.mode;
 
   const reset = useCallback(() => {
@@ -50,6 +54,7 @@ export default function Overlay() {
     setSel(null);
     setPhase("idle");
     setModeOverride(null);
+    aioFromSpace.current = false;
     setMouse(null);
     setRatio(null);
     drag.current = null;
@@ -61,6 +66,7 @@ export default function Overlay() {
     if (!payload) return;
     setImgReady(false);
     setModeOverride(null);
+    aioFromSpace.current = false;
     setP(payload);
     setHint(true);
     setMods({ shift: false, alt: false, cmd: false, space: false });
@@ -129,6 +135,22 @@ export default function Overlay() {
       }
       if (e.key === "Escape") {
         e.preventDefault();
+        // All-In-One: the first Esc clears the selection (for this session
+        // only: the remembered area is kept), the second one leaves
+        if (p.mode === "allInOne" || aioFromSpace.current) {
+          if (sel && phase !== "idle") {
+            drag.current = null;
+            setSel(null);
+            setPickedWindow(null);
+            setModeOverride(aioFromSpace.current ? { mode: "allInOne" } : null);
+            setPhase("idle");
+            return;
+          }
+          if (phase === "window") {
+            setPhase("idle");
+            return;
+          }
+        }
         cancel();
         return;
       }
@@ -138,6 +160,18 @@ export default function Overlay() {
         if (phase === "drag") {
           setMods((m) => ({ ...m, space: true }));
           if (drag.current && mouse) drag.current.spaceBase = { x: mouse.x, y: mouse.y };
+          return;
+        }
+        if (phase === "idle" && (mode === "area" || mode === "allInOne")) {
+          // the whole screen as the selection, with the All-In-One toolbar
+          setHint(false);
+          setPickedWindow(null);
+          setSel({ x: 0, y: 0, w: W, h: H });
+          if (mode === "area") {
+            aioFromSpace.current = true;
+            setModeOverride({ mode: "allInOne" });
+          }
+          setPhase("adjust");
           return;
         }
         if (phase === "idle" || phase === "window") {
@@ -395,7 +429,7 @@ export default function Overlay() {
         />
       )}
       {phase === "adjust" && sel && mode === "record" && (
-        <RecordToolbar key={modeOverride?.kind ?? "rec"} p={p} initialKind={modeOverride?.kind ?? p.recordKind} pickedWindow={pickedWindow} sel={sel} W={W} H={H} ratio={ratio} setRatio={setRatio} setSel={(r) => setSel(clampRect(r, W, H))} commit={commit} cancel={cancel} />
+        <RecordToolbar key={recordKind ?? "rec"} p={p} initialKind={recordKind ?? p.recordKind} pickedWindow={pickedWindow} sel={sel} W={W} H={H} ratio={ratio} setRatio={setRatio} setSel={(r) => setSel(clampRect(r, W, H))} commit={commit} cancel={cancel} />
       )}
       {phase === "adjust" && sel && mode === "scrolling" && <ScrollToolbar p={p} sel={sel} W={W} H={H} commit={commit} cancel={cancel} />}
     </div>

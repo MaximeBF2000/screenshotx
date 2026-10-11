@@ -38,7 +38,14 @@ pub fn open(app: &AppHandle, path: &str, capture_id: Option<String>) {
     let label = format!("annotate-{}", state::new_id());
     let mut spec = Spec::new(&label, "annotate");
     spec.title = "Annotate";
-    spec.query = vec![("path", path.to_string()), ("captureId", capture_id.unwrap_or_default())];
+    // one of our own captures (saved to the export location) vs a file opened
+    // from disk (saved in place)
+    let internal = std::path::Path::new(path).starts_with(crate::paths::captures_dir()) || std::path::Path::new(path).starts_with(crate::paths::temp_dir());
+    spec.query = vec![
+        ("path", path.to_string()),
+        ("captureId", capture_id.unwrap_or_default()),
+        ("internal", if internal { "1" } else { "0" }.to_string()),
+    ];
     spec.width = w;
     spec.height = h;
     spec.min_size = Some((760.0, 480.0));

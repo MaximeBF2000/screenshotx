@@ -11,7 +11,8 @@ Shortcuts**, or pick "Use macOS Shortcuts" during onboarding (⇧⌘3 fullscreen
   on screen, including the menu bar.
 - While dragging: hold **⇧** for a square, **⌥** to resize from the center, and **Space** to move the
   selection.
-- **Space** before dragging switches to window mode. **Enter** without a selection captures the full screen.
+- **Space** before dragging selects the whole screen and opens the All-In-One toolbar (screenshot, scrolling,
+  OCR, video, GIF…). **Enter** without a selection captures the full screen.
 - **Right-click** or **Esc** cancels.
 - Shortcut variants run one action straight away: Capture Area & Copy, & Save, & Annotate, & Pin.
 
@@ -31,8 +32,12 @@ Shortcuts**, or pick "Use macOS Shortcuts" during onboarding (⇧⌘3 fullscreen
 
 ### All-In-One
 An editable selection with resize handles and W×H fields, aspect-ratio and size presets, and one-click
-screenshot, window, fullscreen, self-timer, scrolling, OCR, video or GIF. It remembers the last selection.
-Arrow keys move the selection (⇧ for 10 pt steps) and ⌘/⌥ + arrows resize it. **Enter** captures.
+screenshot, window, fullscreen, self-timer, scrolling, OCR, video or GIF.
+- It opens on the last region you selected in any mode (All-In-One, Capture Area, recording, scrolling, OCR).
+- **Space** selects the whole screen. Arrow keys move the selection (⇧ for 10 pt steps) and ⌘/⌥ + arrows
+  resize it. **Enter** captures.
+- **Esc** clears the selection first, so you can draw a new one; a second **Esc** leaves. Clearing only
+  affects this session: the next All-In-One opens on the remembered region again.
 
 ### Scrolling Capture
 - Select an area, start, then scroll: frames are stitched as you go. Works vertically or horizontally, keeps
@@ -41,12 +46,19 @@ Arrow keys move the selection (⇧ for 10 pt steps) and ⌘/⌥ + arrows resize 
 - **Enter** finishes (same as **Done**), **Esc** cancels.
 
 ### Capture Text (OCR)
-- Recognizes text with Vision and copies it. Also reads QR codes and barcodes.
-- Options: keep line breaks, detect links ("Open link?"), recognition language.
+- Recognizes text and copies it. Two engines (Settings → Screenshots → Text recognition):
+  - **Ollama** (default): a local model, GLM-OCR by default (`ollama pull glm-ocr`, or the Download button in
+    Settings). The server URL and model are configurable.
+  - **Apple Vision**: on device, no setup. Used automatically when Ollama isn't running or the model is
+    missing.
+- QR codes and barcodes are always read with Apple Vision.
+- Options: keep line breaks, detect links ("Open link?"), recognition language (Apple Vision).
 - "Capture Text Without Line Breaks" is a separate action.
 
 ## Quick Access Overlay
 - After each capture, a thumbnail appears in a screen corner (left or right, adjustable size). Captures stack.
+- A capture stays as long as its card is open. Once closed, it can be restored for a few minutes (Restore
+  Recently Closed, or Capture History), then it's deleted unless you saved it.
 - It follows the active screen when you work on several displays, and hides while you select a new capture.
 - Hover buttons: **Copy** and **Save** in the middle; **Close**, **Preview** (Quick Look), **Edit** and **Pin**
   in the corners.
@@ -61,7 +73,9 @@ Arrow keys move the selection (⇧ for 10 pt steps) and ⌘/⌥ + arrows resize 
 ## Annotate (image editor)
 
 ### Tools
-Each tool has a one-letter shortcut.
+Each tool has a one-letter shortcut. Drawing tools always draw, even over existing annotations (a pen
+stroke over a spotlight, for example). Only the Select tool picks up objects; with another tool, hold **⌘**
+to grab and move one. The Text tool edits a text you click on.
 
 | Tool | Key | Notes |
 | --- | --- | --- |
@@ -133,7 +147,9 @@ Saturation/brightness square, hue and opacity sliders, hex input, a screen eyedr
   estimated file size.
 
 ## Capture History
-- Every capture is kept for a configurable period (default 1 month). See [storage.md](storage.md).
+- Lists the captures that still exist: captures are ephemeral, so a closed capture is kept only for the "Keep
+  captures" delay (5 minutes by default), and everything is deleted when the app quits. See
+  [storage.md](storage.md).
 - Filter by type, search, restore to Quick Access, or drag files out.
 
 ## Also included

@@ -16,7 +16,7 @@ use objc2_core_graphics::{
 };
 use objc2_foundation::{NSArray, NSString, NSURL};
 use std::path::Path;
-use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
+use tauri::{AppHandle, Runtime, WebviewWindow};
 
 /// Run a closure on the main thread and wait for its result.
 pub fn on_main<R: Send + 'static, F: FnOnce(MainThreadMarker) -> R + Send + 'static>(
@@ -287,6 +287,18 @@ pub fn open_url(url: &str) {
 }
 
 pub fn open_path(path: &str) {
+    let p = Path::new(path);
+    if p.is_dir() && p.extension().is_some_and(|e| e == "app") {
+        // Finder treats a folder named "*.app" (e.g. a custom storage
+        // location) as an application and fails to launch it; selecting an
+        // item inside opens a Finder window on the folder's contents instead
+        let mut children: Vec<_> = std::fs::read_dir(p).map(|rd| rd.flatten().map(|e| e.path()).collect()).unwrap_or_default();
+        children.sort();
+        if let Some(first) = children.iter().find(|c| !c.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'))) {
+            reveal_in_finder(&first.to_string_lossy());
+            return;
+        }
+    }
     let u = NSURL::fileURLWithPath(&NSString::from_str(path));
     NSWorkspace::sharedWorkspace().openURL(&u);
 }
@@ -386,9 +398,6 @@ pub fn print_image(app: &AppHandle, path: String) {
     });
 }
 
-pub fn app_data_dir(app: &AppHandle) -> std::path::PathBuf {
-    app.path().app_data_dir().unwrap_or_else(|_| crate::paths::config_dir())
-}
 
 /// Ask the system for Screen Recording permission (shows the prompt once).
 pub fn has_screen_permission() -> bool {

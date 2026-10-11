@@ -147,9 +147,7 @@ fn resolve_actions(kind: &CaptureKind, action: &Option<String>) -> crate::settin
 pub fn run_actions(app: &AppHandle, mut item: CaptureItem, img: Option<&RgbaImage>, action: Option<String>) {
     let s = settings();
     let ac = resolve_actions(&item.kind, &action);
-    if s.history_days > 0 {
-        crate::history::add(app, &item);
-    }
+    crate::history::add(app, &item);
     if ac.save {
         match save_to_export_location(&item) {
             Ok(p) => {
@@ -231,18 +229,6 @@ pub fn save_to_dir(item: &CaptureItem, dir: &Path) -> anyhow::Result<PathBuf> {
         let _ = std::fs::remove_file(src);
     }
     Ok(dst)
-}
-
-/// Remove a temp capture file if it was never saved anywhere.
-pub fn discard_if_temp(item: &CaptureItem) {
-    let p = Path::new(&item.path);
-    if !item.saved && p.starts_with(paths::captures_dir()) {
-        // keep it if something else (pin / annotate) still uses it
-        let in_use = state::state().pins.lock().iter().any(|pi| pi.path == item.path);
-        if !in_use {
-            let _ = std::fs::remove_file(p);
-        }
-    }
 }
 
 /// Finish a recording (video or GIF) file.

@@ -14,6 +14,7 @@ pub mod macos;
 pub mod naming;
 pub mod nativeimage;
 pub mod ocr;
+pub mod ocr_ollama;
 pub mod output;
 pub mod paths;
 pub mod permissions;
@@ -98,14 +99,27 @@ pub fn open_file(app: &tauri::AppHandle, p: &std::path::Path) {
     }
 }
 
-pub fn run() {
-    let log_dir = dirs::home_dir().unwrap_or_default().join("Library/Logs/Screenshot X");
-    let _ = std::fs::create_dir_all(&log_dir);
-    let mut lb = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,tao=warn,wry=warn"));
-    if let Ok(f) = std::fs::OpenOptions::new().create(true).append(true).open(log_dir.join("app.log")) {
-        lb.target(env_logger::Target::Pipe(Box::new(f)));
+/// Appends to `<data folder>/Logs/app.log`, reopening the file for each
+/// record so logging follows the data folder when it moves.
+struct LogFile;
+
+impl std::io::Write for LogFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut f = std::fs::OpenOptions::new().create(true).append(true).open(paths::logs_dir().join("app.log"))?;
+        f.write_all(buf)?;
+        Ok(buf.len())
     }
-    lb.init();
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+pub fn run() {
+    // the data folder (and so the logs) can be moved in Settings → Advanced
+    paths::set_data_root(&settings::Settings::load().storage_location);
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,tao=warn,wry=warn"))
+        .target(env_logger::Target::Pipe(Box::new(LogFile)))
+        .init();
     log::info!("Screenshot X starting");
     std::panic::set_hook(Box::new(|info| {
         log::error!("panic: {info}\n{}", std::backtrace::Backtrace::force_capture());
@@ -155,18 +169,20 @@ pub fn run() {
                 });
             }
 
+            // captures are ephemeral: leftovers from a session that didn't
+            // quit cleanly go first, then unused captures expire after a few minutes
+            history::purge_all();
+            {
+                let h = handle.clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(history::SWEEP_INTERVAL);
+                    history::sweep(&h);
+                });
+            }
+
             // Warm up the windows that must appear instantly.
             capture::prewarm_overlays(&handle);
             quick_access::prewarm(&handle);
-            history::prune(&handle);
-            {
-                // keep history / temp files tidy while the app stays running
-                let h = handle.clone();
-                std::thread::spawn(move || loop {
-                    std::thread::sleep(std::time::Duration::from_secs(6 * 3600));
-                    history::prune(&h);
-                });
-            }
 
             if !s.onboarding_done {
                 windows::open_regular(&handle, "onboarding", "onboarding", "Welcome to Screenshot X", 640.0, 560.0, false);
@@ -256,6 +272,9 @@ pub fn run() {
             commands::scroll_control,
             commands::scroll_preview,
             commands::qa_replace,
+            commands::ocr_ollama_status,
+            commands::ocr_ollama_pull,
+            commands::open_logs,
             commands::storage_info,
             commands::set_storage_location,
             commands::pick_color,
@@ -270,6 +289,8 @@ pub fn run() {
                     api.prevent_exit();
                 }
             }
+            // Quitting deletes every capture (saved files live elsewhere)
+            tauri::RunEvent::Exit => history::purge_all(),
             // Finder "Open With → Screenshot X" (and dropping files on the icon)
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Opened { urls } => {

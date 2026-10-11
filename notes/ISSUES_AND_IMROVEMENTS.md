@@ -1,0 +1,8 @@
+# Issues I found while testing the software
+
+- In annotate mode, when using a tool that is not the moving tool we should not be take the focus and be able to move stuff (that prevents the user to use the tool selected. Example: I should be able to use the Pen tool or Hightlihter tool on a spotlight region without selecting and moving that spotlight annotation instead)
+- OCR is bad currently, I want to use Ollama + GLM-OCR Model to do the OCR => Make it easily swappable
+- Currently on scroll captures, if the app settings are open but in background, they move to the forground, potentially ruining the scrolling capture -> fix this
+- Pressing space in screenshot mode select the whole screen but not like in All-One mode -> We don't see the menu for screenshot / scrolling screenshot / video ect -> It should be like that (basically pressing space is just like doing a screenshot just put the start and end coordinates at top left and bottom right of the screen)
+- All-In-One Mode should open the last region selected (either by previous All in One, regular mode or else)
+- In All-In-One mode, Pressing Esc should clear the selected region if it exists, and leave screenshot mode / go back to regular mode if it does not (basically if there is a selected region, the user has to Press Esc two times to leave screenshot mode -> That's useful when selected region is the whole screen or almost, and the user wants to select another region) -> One important thing, this shortcut to clear the last region should only happen in this "session" of All-In-One mode but should not clear the last region from memory -> If the user does this : Press Esc two times, without having reselected a new region, then reopen All-In-One, then the previously removed region should reappear 

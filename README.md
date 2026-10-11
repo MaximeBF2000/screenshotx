@@ -13,6 +13,8 @@ It is built with **Rust + Tauri 2** on the native side (ScreenCaptureKit, AVFoun
 - Xcode Command Line Tools: `xcode-select --install`
 - [Rust](https://rustup.rs) (stable)
 - Node.js 20+ and [pnpm](https://pnpm.io)
+- Optional: [Ollama](https://ollama.com) with `glm-ocr` (`ollama pull glm-ocr`) for text recognition. Without it,
+  Capture Text uses Apple Vision.
 
 ## Setup
 
@@ -61,31 +63,30 @@ works, but macOS asks for the permissions again after each rebuild.
 
 ## Where your data lives
 
+Captures are **ephemeral**: they exist while you use them, then they're deleted. Only the files you save are
+kept.
+
 | What | Default location |
 | --- | --- |
-| Settings (`settings.json`) | `~/Library/Application Support/com.screenshotx.app/` (always) |
-| Data folder: `Captures/`, `History/`, `Thumbnails/`, `history.json` | `~/Library/Application Support/com.screenshotx.app/` |
-| Temporary files (recording segments, previews, exports in progress) | `$TMPDIR/com.screenshotx.app/` |
-| Logs | `~/Library/Logs/Screenshot X/app.log` |
+| Settings (`settings.json`) | `~/Library/Application Support/Screenshot X/` (always) |
+| Captures (with their thumbnails in `Captures/.thumbnails/`) | `~/Library/Application Support/Screenshot X/Captures/` |
+| Logs | `~/Library/Application Support/Screenshot X/Logs/app.log` |
+| Temporary files (recording segments, previews, exports in progress) | `$TMPDIR/Screenshot X/` |
 | Saved screenshots and recordings | Your **Export location** (default: `~/Downloads`) |
 
-You can move the data folder in **Settings → Advanced → Storage location**. Existing captures and history
-are moved with it, and **Reset** returns to the default. Settings always stay in the default folder,
-because they record where the data folder is.
+You can move the data folder (`Captures/` and `Logs/`) in **Settings → Advanced → Storage location**.
+Existing files are moved with it, and **Reset** returns to the default. Settings always stay in the default
+folder, because they record where the data folder is.
 
 ### Retention
 
-- **Capture History** keeps a copy of each capture for the period set in **Settings → Advanced → Capture
-  history**: Never, 1 day, 1 week, **1 month (default)** or 3 months. Older entries and their thumbnails
-  are deleted. "Never" keeps nothing and clears the existing history.
-- **Captures** waiting in Quick Access live in `Captures/`. Saving moves the file to your export location.
-  Closing an unsaved capture deletes it. Unsaved captures that nothing uses anymore (no Quick Access card, no
-  pin) are deleted after 2 days.
-- **Thumbnails** that no history entry or Quick Access card uses are deleted after 2 days.
-- **Temporary files** older than 2 days are deleted.
-
-Cleanup runs when the app starts and every 6 hours after that. Files in your export location are never
-touched.
+- A capture is kept while it's in **Quick Access**, pinned, or open in an editor.
+- Once nothing uses it, it's deleted after the **Keep captures** delay (Settings → Advanced). Images and videos
+  have separate delays, from 1 minute to 1 hour, **5 minutes by default**. Until then you can bring it back
+  from Capture History or with Restore Recently Closed.
+- **Quitting Screenshot X deletes every capture** and temporary file. So does launching it, in case it didn't
+  quit cleanly.
+- Saving moves the capture to your export location. Screenshot X never deletes files there.
 
 See [docs/storage.md](docs/storage.md) for the details.
 
@@ -95,5 +96,6 @@ See [docs/storage.md](docs/storage.md) for the details.
   video editor, with their keyboard shortcuts.
 - [Settings](docs/settings.md): what each settings tab controls.
 - [URL scheme](docs/url-scheme.md): automate Screenshot X with `screenshotx://` links.
-- [Storage and retention](docs/storage.md): the data folder, cleanup rules and moving the data.
+- [Storage and retention](docs/storage.md): where captures live, when they're deleted, and moving the data
+  folder.
 - [Development](docs/development.md): architecture, debugging, the browser preview and known pitfalls.

@@ -73,9 +73,6 @@ pub fn apply_side_effects(app: &AppHandle, before: &Settings, new: &Settings) {
     if before.qa_position != new.qa_position || before.qa_size != new.qa_size {
         crate::quick_access::relayout(app);
     }
-    if before.history_days != new.history_days {
-        crate::history::prune(app);
-    }
     if before.wallpaper_source != new.wallpaper_source
         || before.custom_wallpaper_path != new.custom_wallpaper_path
         || before.wallpaper_plain_color != new.wallpaper_plain_color
@@ -830,4 +827,27 @@ pub async fn set_storage_location(app: AppHandle, path: String) -> CmdResult<Sto
         .map_err(err)?
         .map_err(|e| format!("{e:#}"))?;
     Ok(storage_info())
+}
+
+#[tauri::command]
+pub fn open_logs() {
+    macos::open_path(&crate::paths::logs_dir().to_string_lossy());
+}
+
+#[tauri::command]
+pub async fn ocr_ollama_status() -> crate::ocr_ollama::Status {
+    let s = settings();
+    tauri::async_runtime::spawn_blocking(move || crate::ocr_ollama::status(&s.ocr_ollama_url, &s.ocr_ollama_model))
+        .await
+        .unwrap_or(crate::ocr_ollama::Status { running: false, installed: false, error: Some("internal error".into()) })
+}
+
+/// Download the configured OCR model with Ollama.
+#[tauri::command]
+pub async fn ocr_ollama_pull() -> CmdResult<()> {
+    let s = settings();
+    tauri::async_runtime::spawn_blocking(move || crate::ocr_ollama::pull(&s.ocr_ollama_url, &s.ocr_ollama_model))
+        .await
+        .map_err(err)?
+        .map_err(|e| format!("{e:#}"))
 }

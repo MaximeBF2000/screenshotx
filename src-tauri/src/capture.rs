@@ -373,10 +373,13 @@ fn commit_inner(app: &AppHandle, sess: &Session, c: &Commit) -> Result<()> {
     if let Some(r) = rect {
         let area = SavedArea { display_id: d.id, x: r.x, y: r.y, w: r.w, h: r.h };
         state::update_settings(|st| {
-            match sess.mode {
-                Mode::AllInOne => st.last_aio_area = Some(area.clone()),
-                Mode::Record => st.last_record_area = Some(area.clone()),
-                _ => {}
+            // All-In-One reopens on the last region selected in any mode
+            // (fullscreen and window captures aren't selections)
+            if c.kind != "fullscreen" && c.kind != "window" {
+                st.last_aio_area = Some(area.clone());
+            }
+            if sess.mode == Mode::Record || c.kind == "record" {
+                st.last_record_area = Some(area.clone());
             }
             if c.kind == "area" || c.kind == "selftimer" {
                 st.last_area = Some(area);

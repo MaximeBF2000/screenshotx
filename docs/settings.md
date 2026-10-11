@@ -1,7 +1,7 @@
 # Settings
 
 Open Settings from the menu-bar icon, or with `screenshotx://open-settings?tab=…`. Changes apply right away
-and are saved to `~/Library/Application Support/com.screenshotx.app/settings.json`.
+and are saved to `~/Library/Application Support/Screenshot X/settings.json`.
 
 ## General
 - **Startup**: start at login.
@@ -42,7 +42,9 @@ after dragging, file info on hover, and tips.
 ## Screenshots
 File format, Retina scaling and `@2x` suffix, 1px border, cursor, window shadow and background, freeze
 screen, crosshair mode, magnifier, All-In-One "remember last selection", self-timer interval, an automatic
-Background tool preset, and text recognition (line breaks, links, language).
+Background tool preset, and text recognition: the engine (Ollama with a local model, GLM-OCR by default, or
+Apple Vision), the Ollama server and model with a status line and a Download button, line breaks, links, and
+the language (Apple Vision only).
 
 ## Annotate
 Inverse arrow direction, smooth pencil drawing, remember whether the Background tool was open, shadows on
@@ -52,8 +54,10 @@ objects, color names, always on top, Save button behavior (export location or as
 - **File name**: the pattern for new files, built from tokens (date, time, app name, window title, counter…),
   with UTC time and illegal-character removal.
 - **Pinned screenshots**: show pins on screenshots, fade locked pins, shadow.
-- **Capture history**: how long captures are kept (Never, 1 day, 1 week, 1 month, 3 months).
-- **Storage location**: the data folder for captures, history and thumbnails. **Choose…** moves the existing
+- **Keep captures**: how long a capture is kept once nothing uses it (no Quick Access card, pin or editor),
+  separately for images and videos: 1, 5 (default), 15 or 30 minutes, or 1 hour. Quitting deletes every
+  capture; saved files are never deleted.
+- **Storage location**: the data folder for captures and logs. **Choose…** moves the existing
   data to the new folder, **Reset** moves it back to the default. See [storage.md](storage.md).
 - **URL scheme**: allow other apps to control Screenshot X.
 - **Dialogs**: reset the warnings you dismissed.

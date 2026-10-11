@@ -1,5 +1,4 @@
-//! Moving the data folder (captures, Capture History, thumbnails) to a
-//! user-chosen location.
+//! Moving the data folder (captures and logs) to a user-chosen location.
 
 use crate::paths;
 use crate::state;
@@ -8,7 +7,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter};
 
 /// What lives in the data folder.
-const ENTRIES: [&str; 4] = ["Captures", "History", "Thumbnails", "history.json"];
+const ENTRIES: [&str; 2] = ["Captures", "Logs"];
 
 /// Resolve a "Storage location" setting to a folder ("" = the default).
 fn resolve(location: &str) -> PathBuf {
@@ -56,7 +55,7 @@ pub fn set_location(app: &AppHandle, location: &str) -> Result<PathBuf> {
         return Ok(new);
     }
     if new.starts_with(&old) && ENTRIES.iter().any(|e| new.starts_with(old.join(e))) {
-        bail!("Choose a folder outside the current Captures or History folders.");
+        bail!("Choose a folder outside the current Captures or Logs folders.");
     }
     std::fs::create_dir_all(&new).with_context(|| format!("creating {}", new.display()))?;
     let probe = new.join(".screenshotx-write-test");
@@ -64,7 +63,7 @@ pub fn set_location(app: &AppHandle, location: &str) -> Result<PathBuf> {
     let _ = std::fs::remove_file(probe);
 
     let st = state::state();
-    // hold the history lock so no capture lands in the old folder meanwhile
+    // hold the history lock so no capture is added meanwhile
     let mut history = st.history.lock();
     for e in ENTRIES {
         move_entry(&old.join(e), &new.join(e))?;
@@ -87,7 +86,6 @@ pub fn set_location(app: &AppHandle, location: &str) -> Result<PathBuf> {
     }
     let stored = if new == paths::config_dir() { String::new() } else { to.clone() };
     paths::set_data_root(&stored);
-    history.save();
     drop(history);
     state::update_settings(|s| s.storage_location = stored);
     log::info!("storage moved: {from} -> {to}");

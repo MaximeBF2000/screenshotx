@@ -110,7 +110,7 @@ export default function Annotate() {
     actions.source.path = path;
     actions.source.captureId = params.get("captureId") ?? "";
     actions.source.project = path.endsWith(".screenshotx");
-    actions.source.external = !!path && !path.includes("/com.screenshotx.app/");
+    actions.source.external = !!path && params.get("internal") !== "1";
     setTitle(path ? basename(path) : "Untitled");
     buildDoc(path)
       .then(({ doc, images }) => {

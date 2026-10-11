@@ -26,7 +26,8 @@ export default function History() {
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
-  const days = useSettings((s) => s.settings?.historyDays ?? 30);
+  const keepImages = useSettings((s) => s.settings?.keepImagesMinutes ?? 5);
+  const keepVideos = useSettings((s) => s.settings?.keepVideosMinutes ?? 5);
 
   const load = () => invoke<CaptureItem[]>("history_list").then((l) => setItems(l ?? []));
   useEffect(() => {
@@ -123,15 +124,19 @@ export default function History() {
           small
           disabled={!items.length}
           onClick={async () => {
-            if (await ask("Are you sure you want to delete all files from history?\n\nThis operation cannot be undone.", { title: "Clear History", kind: "warning", okLabel: "Clear History" })) invoke("history_clear");
+            if (await ask("Delete all recent captures?\n\nCaptures you haven't saved are deleted. Files you saved stay where they are.", { title: "Clear History", kind: "warning", okLabel: "Clear History" })) invoke("history_clear");
           }}
         >
           Clear History…
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto px-6 py-4" onClick={() => setSel(null)}>
-        {days === 0 && <Empty title="Capture History is disabled." body="Enable it in Settings → Advanced → Capture history." />}
-        {days > 0 && !shown.length && <Empty title={items.length ? "No matching captures" : "No captures yet"} body={`Captures from the last ${days === 1 ? "day" : days === 7 ? "week" : days === 30 ? "month" : `${days} days`} appear here.`} />}
+        {!shown.length && (
+          <Empty
+            title={items.length ? "No matching captures" : "No recent captures"}
+            body={`Captures are ephemeral: once closed, images are kept ${minutes(keepImages)} and videos ${minutes(keepVideos)}, and everything is deleted when Screenshot X quits. Saved files stay where you saved them.`}
+          />
+        )}
         {groups.map(([label, list]) => (
           <section key={label} className="mb-5">
             <div className="text-[12px] font-semibold text-[var(--text-2)] mb-2 sticky top-0">{label}</div>
@@ -231,4 +236,8 @@ function HoverBtn({ children, title, onClick }: { children: React.ReactNode; tit
       {children}
     </button>
   );
+}
+
+function minutes(m: number) {
+  return m >= 60 ? `${m / 60} hour${m === 60 ? "" : "s"}` : `${m} minute${m === 1 ? "" : "s"}`;
 }

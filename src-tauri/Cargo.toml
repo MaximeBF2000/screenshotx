@@ -40,6 +40,8 @@ gifski = { version = "1.34", default-features = false, features = ["png"] }
 imgref = "1"
 rgb = "0.8"
 base64 = "0.22"
+# local Ollama API for OCR (plain HTTP, no TLS)
+ureq = { version = "2.12", default-features = false, features = ["json"] }
 objc2 = { version = "0.6", features = ["exception"] }
 block2 = "0.6"
 dispatch2 = "0.3"

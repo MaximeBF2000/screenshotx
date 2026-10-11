@@ -1,16 +1,22 @@
 use std::path::PathBuf;
 
-pub const BUNDLE_ID: &str = "com.screenshotx.app";
+/// Folder name under Application Support and the temp folder. Not the bundle
+/// id: Finder treats a folder named "com.screenshotx.app" as an application.
+pub const DIR_NAME: &str = "Screenshot X";
 
 fn ensure(p: PathBuf) -> PathBuf {
     let _ = std::fs::create_dir_all(&p);
     p
 }
 
-/// `~/Library/Application Support/com.screenshotx.app`: settings.json always
-/// lives here, and it is the default data folder.
+fn app_support() -> PathBuf {
+    dirs::config_dir().unwrap_or_else(std::env::temp_dir)
+}
+
+/// `~/Library/Application Support/Screenshot X`: settings.json always lives
+/// here, and it is the default data folder.
 pub fn config_dir() -> PathBuf {
-    ensure(dirs::config_dir().unwrap_or_else(std::env::temp_dir).join(BUNDLE_ID))
+    ensure(app_support().join(DIR_NAME))
 }
 
 /// Custom data folder (Settings → Advanced → Storage location), if any.
@@ -22,7 +28,7 @@ pub fn set_data_root(location: &str) {
     *DATA_ROOT.write().unwrap() = root;
 }
 
-/// Captures, Capture History, thumbnails and the history index.
+/// Captures (with their thumbnails) and logs.
 pub fn data_dir() -> PathBuf {
     match DATA_ROOT.read().unwrap().clone() {
         Some(p) => ensure(p),
@@ -35,17 +41,17 @@ pub fn captures_dir() -> PathBuf {
     ensure(data_dir().join("Captures"))
 }
 
-/// Copies of every capture kept for Capture History.
-pub fn history_dir() -> PathBuf {
-    ensure(data_dir().join("History"))
+/// Thumbnails for Quick Access and Capture History, next to the captures.
+pub fn thumbs_dir() -> PathBuf {
+    ensure(captures_dir().join(".thumbnails"))
 }
 
-pub fn thumbs_dir() -> PathBuf {
-    ensure(data_dir().join("Thumbnails"))
+pub fn logs_dir() -> PathBuf {
+    ensure(data_dir().join("Logs"))
 }
 
 pub fn temp_dir() -> PathBuf {
-    ensure(std::env::temp_dir().join(BUNDLE_ID))
+    ensure(std::env::temp_dir().join(DIR_NAME))
 }
 
 /// Return a path in `dir` named `stem.ext` that does not exist yet

@@ -137,22 +137,30 @@ pub fn find(id: &str) -> Option<CaptureItem> {
 }
 
 fn update_item(id: &str, f: impl FnOnce(&mut CaptureItem)) {
-    if let Some(i) = state::state().qa_items.lock().iter_mut().find(|i| i.id == id) {
+    let path = {
+        let st = state::state();
+        let mut items = st.qa_items.lock();
+        let Some(i) = items.iter_mut().find(|i| i.id == id) else { return };
         f(i);
-    }
+        i.path.clone()
+    };
+    // saved / renamed: Capture History follows the file
+    crate::history::update_path(id, &path);
 }
 
+/// Close a card. Its file stays for "Keep captures after closing" (so it can
+/// be restored), then the cleanup in history.rs deletes it.
 pub fn close(app: &AppHandle, id: &str, remember: bool) {
-    close_inner(app, id, remember, true);
+    close_inner(app, id, remember);
 }
 
 /// Close a card whose file was handed to another window (Annotate, Video
-/// Editor, pin): the file must survive; stale captures are pruned later.
+/// Editor, pin): the file stays while that window uses it.
 pub fn close_keep_file(app: &AppHandle, id: &str) {
-    close_inner(app, id, true, false);
+    close_inner(app, id, true);
 }
 
-fn close_inner(app: &AppHandle, id: &str, remember: bool, discard: bool) {
+fn close_inner(app: &AppHandle, id: &str, remember: bool) {
     let removed = {
         let st = state::state();
         let mut items = st.qa_items.lock();
@@ -167,10 +175,6 @@ fn close_inner(app: &AppHandle, id: &str, remember: bool, discard: bool) {
             if closed.len() > 20 {
                 closed.remove(0);
             }
-        }
-        // Temp files go away; history keeps its own copy for restoring.
-        if discard && !item.saved {
-            crate::output::discard_if_temp(&item);
         }
     }
     relayout(app);
@@ -209,18 +213,15 @@ pub fn restore(app: &AppHandle) {
     let item = match item {
         Some(mut it) => {
             if !Path::new(&it.path).exists() {
-                // the temp file was removed: restore from history copy
+                // the file moved (saved / renamed) since the card closed
                 if let Some(h) = crate::history::find(&it.id) {
                     it.path = h.path.clone();
-                    it.saved = true;
+                    it.saved = h.saved;
                 }
             }
             Some(it)
         }
-        None => crate::history::latest().map(|mut h| {
-            h.saved = true;
-            h
-        }),
+        None => crate::history::latest(),
     };
     match item {
         Some(it) if Path::new(&it.path).exists() => add(app, it),

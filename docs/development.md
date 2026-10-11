@@ -24,9 +24,14 @@ docs/                this documentation
 - `recording.rs`: `SCStream` + `SCRecordingOutput`; pause/resume records segments that are joined at the end.
 - `video.rs`: AVFoundation export, audio mixing, thumbnails, GIFs (gifski).
 - `scrolling.rs`: the scrolling-capture stitcher.
-- `ocr.rs`: Vision text and barcode recognition.
-- `quick_access.rs`, `pins.rs`, `annotate.rs`, `history.rs`, `desktop.rs` (desktop-icon cover windows).
-- `output.rs`: what happens after a capture (save, copy, history, thumbnails).
+- `ocr.rs`: text recognition behind an `Engine` trait (Apple Vision, Ollama), plus Vision barcode reading.
+  `ocr_ollama.rs`: the Ollama client. To add an engine, implement `Engine` and return it from `ocr::engine`.
+- `quick_access.rs`, `pins.rs`, `annotate.rs`, `desktop.rs` (desktop-icon cover windows).
+- `history.rs`: recent captures (in memory) and the ephemeral cleanup: `sweep` runs every 15 s and deletes
+  captures unused for longer than "Keep captures"; `purge_all` empties `Captures/` and the temp folder at
+  launch and on quit. A file counts as in use while it's on a Quick Access card, a pin, or in any window's
+  `?path=` query (editors, Video Editor, renderer).
+- `output.rs`: what happens after a capture (save, copy, thumbnails).
 - `paths.rs`, `storage.rs`: the settings and data folders, and moving the data folder.
 - `windows.rs`: window creation and non-activating `NSPanel`s.
 - `hotkeys.rs`: global shortcuts, plus temporary "session keys" (Esc, Enter, Space, arrows) while an overlay is
@@ -59,8 +64,9 @@ browser, native commands are mocked (`registerMock` in `src/main.tsx`), and the 
 
 ## Logs
 
-`~/Library/Logs/Screenshot X/app.log`: Rust logs, panics, and JavaScript errors forwarded from every window.
-Settings → About → Open Logs opens the folder.
+`<data folder>/Logs/app.log` (default `~/Library/Application Support/Screenshot X/Logs/app.log`): Rust
+logs, panics, and JavaScript errors forwarded from every window. The file is reopened for each line, so logging
+follows the data folder when it moves. Settings → About → Open Logs opens the folder.
 
 ## Debug-only URL commands
 
@@ -80,6 +86,11 @@ clicking:
 Set `SX_NO_HOTKEYS=1` to start without registering global shortcuts.
 
 ## Pitfalls
+- **Your captures are deleted when a build starts**: launching any build runs the purge on the data folder.
+  Don't run a test build against data you want to keep.
+- **`open screenshotx://…` goes to the registered app**, which may be your installed copy, not the build you're
+  testing. Pass the link as an argument instead (single-instance forwards it to the running build):
+  `".../Screenshot X.app/Contents/MacOS/screenshotx" "screenshotx://debug-qa?action=close"`.
 - **Single instance**: a built app exits right away while `pnpm tauri dev` is running.
 - **Build only through `tauri build`**: `cargo build` compiles a separate copy of every dependency.
 - **`strip = false`** stays in every profile of `Cargo.toml` (dev and release, including `package."*"` and

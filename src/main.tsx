@@ -37,7 +37,7 @@ if (!isTauri && import.meta.env.DEV) {
   // Browser preview (dev only): minimal stand-ins for native commands.
   registerMock("image_info", () => [1400, 900, 1]);
   registerMock("export_dir", () => "/Users/me/Desktop");
-  const storageDefault = "/Users/me/Library/Application Support/com.screenshotx.app";
+  const storageDefault = "/Users/me/Library/Application Support/Screenshot X";
   let storage = storageDefault;
   registerMock("storage_info", () => ({ current: storage, default: storageDefault }));
   registerMock("set_storage_location", (a) => {
@@ -60,11 +60,15 @@ if (!isTauri && import.meta.env.DEV) {
     magnifier: true,
     freeze: true,
     preset: null,
-    remember: null,
+    // ?remember=1: reopen on a remembered area (All-In-One)
+    remember: params.get("remember") ? { displayId: 1, x: 160, y: 120, w: 360, h: 220 } : null,
     recordKind: "video",
     settings: { recShowCursor: true, recRecordMicrophone: true },
     accent: "#0a84ff",
   }));
+  registerMock("overlay_cancel", () => {
+    (window as any).__cancels = ((window as any).__cancels ?? 0) + 1;
+  });
   registerMock("overlay_commit", (a) => {
     (window as any).__lastCommit = a.commit;
     console.info("commit", JSON.stringify(a.commit));

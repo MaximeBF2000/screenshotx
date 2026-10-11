@@ -184,11 +184,20 @@ export function AnnotateCanvas() {
       }
     }
 
-    // existing objects: anything when moving; only the stroke for hollow shapes with drawing tools
-    const strict = tool !== "move";
-    const h = topHit(doc.objects, p, tol, strict);
-    if (h && !(tool === "counter" && h.type !== "counter" && !e.altKey)) {
-      if ((e.detail === 2 || tool === "text") && h.type === "text" && selected.includes(h.id)) {
+    // Existing objects are grabbed only by the move tool (or with ⌘ held):
+    // drawing tools always draw, e.g. a pen stroke over a spotlight. The Text
+    // tool still edits a text it clicks on.
+    const grab = tool === "move" || e.metaKey;
+    const h = grab || tool === "text" ? topHit(doc.objects, p, tol, false) : null;
+    if (h && tool === "text" && !grab) {
+      if (h.type === "text") {
+        e.preventDefault();
+        st.select([h.id]);
+        startText(p, h);
+        return;
+      }
+    } else if (h) {
+      if (e.detail === 2 && h.type === "text" && selected.includes(h.id)) {
         e.preventDefault();
         startText(p, h);
         return;
