@@ -93,6 +93,7 @@ pub fn finish_screenshot(app: &AppHandle, mut img: RgbaImage, mut scale: f64, ct
         saved: false,
         app_name: ctx.app_name.clone(),
         ocr_text: None,
+        project: None,
     };
     if s.auto_apply_background_preset && !s.auto_background_preset_id.is_empty() {
         // Rendered by the (hidden) annotate renderer, which then calls back
@@ -204,6 +205,49 @@ pub fn run_actions(app: &AppHandle, mut item: CaptureItem, img: Option<&RgbaImag
     }
 }
 
+/// File extension for a "screenshot format" setting value.
+pub fn image_extension(format: &str) -> &'static str {
+    match format {
+        "jpg" | "jpeg" => "jpg",
+        "heic" => "heic",
+        "webp" => "webp",
+        _ => "png",
+    }
+}
+
+/// A Quick Access item for a file that's already on disk (None if missing).
+pub fn file_item(path: &str) -> Option<CaptureItem> {
+    let p = Path::new(path);
+    if !p.exists() {
+        return None;
+    }
+    let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let is_video = matches!(ext.as_str(), "mp4" | "mov" | "m4v");
+    let (width, height) = if is_video { (0, 0) } else { image::image_dimensions(p).unwrap_or((0, 0)) };
+    let thumb = if is_video {
+        crate::video::thumbnail(p).unwrap_or_default()
+    } else {
+        crate::imageops::load(p).map(|i| make_image_thumb(&i, p)).unwrap_or_default()
+    };
+    Some(CaptureItem {
+        id: state::new_id(),
+        kind: if is_video { CaptureKind::Video } else if ext == "gif" { CaptureKind::Gif } else { CaptureKind::Screenshot },
+        path: path.to_string(),
+        width,
+        height,
+        scale: if ext == "png" { crate::imageops::png_scale(p) } else { 1.0 },
+        created: state::now_ms(),
+        size: std::fs::metadata(p).map(|m| m.len()).unwrap_or(0),
+        duration: if is_video { crate::video::duration(p) } else { None },
+        thumb,
+        // files in our capture / temp folders are deleted unless saved
+        saved: !p.starts_with(paths::captures_dir()) && !p.starts_with(paths::temp_dir()),
+        app_name: String::new(),
+        ocr_text: None,
+        project: None,
+    })
+}
+
 pub fn export_dir() -> PathBuf {
     let s = settings();
     let p = paths::expand_tilde(&s.export_location);
@@ -250,6 +294,7 @@ pub fn finish_recording(app: &AppHandle, path: PathBuf, kind: CaptureKind, width
         saved: false,
         app_name: ctx_app,
         ocr_text: None,
+        project: None,
     };
     if s.play_sounds {
         crate::macos::play_sound(app, "stop");

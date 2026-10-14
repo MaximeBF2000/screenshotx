@@ -19,7 +19,9 @@ docs/                this documentation
 ```
 
 ### Rust modules (`src-tauri/src/`)
-- `capture.rs`: capture sessions, overlay windows and commits.
+- `capture.rs`: capture sessions, overlay windows and commits. A session snapshots every display first (so
+  hover states and open menus are kept), then shows the overlays as invisible "shields" that take the mouse
+  right away; each overlay becomes visible once it rendered the session (`overlay_ready`).
 - `sck.rs`: ScreenCaptureKit captures and window lists.
 - `recording.rs`: `SCStream` + `SCRecordingOutput`; pause/resume records segments that are joined at the end.
 - `video.rs`: AVFoundation export, audio mixing, thumbnails, GIFs (gifski).

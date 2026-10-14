@@ -47,6 +47,10 @@ pub struct CaptureItem {
     pub app_name: String,
     #[serde(default)]
     pub ocr_text: Option<String>,
+    /// Annotate project (`.screenshotx`) kept by the editor's Save: the
+    /// original image and its annotations, so they stay editable
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 impl CaptureItem {
@@ -63,7 +67,8 @@ pub struct AppState {
     pub session: Mutex<Option<crate::capture::Session>>,
     pub qa_items: Mutex<Vec<CaptureItem>>,
     pub qa_closed: Mutex<Vec<CaptureItem>>,
-    pub qa_hidden: AtomicBool,
+    /// Quick Access tucked away at the bottom edge (only a tab shows)
+    pub qa_tucked: AtomicBool,
     pub history: Mutex<crate::history::History>,
     pub recording: Mutex<Option<crate::recording::Recording>>,
     pub scrolling: Mutex<Option<crate::scrolling::ScrollSession>>,
@@ -83,7 +88,7 @@ impl AppState {
             session: Mutex::new(None),
             qa_items: Mutex::new(vec![]),
             qa_closed: Mutex::new(vec![]),
-            qa_hidden: AtomicBool::new(false),
+            qa_tucked: AtomicBool::new(false),
             history: Mutex::new(crate::history::History::default()),
             recording: Mutex::new(None),
             scrolling: Mutex::new(None),

@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use image::RgbaImage;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -75,6 +75,25 @@ pub fn prewarm_overlays(app: &AppHandle) {
     }
 }
 
+/// Replace every overlay with a fresh one, for the current displays
+/// (after sleep, unlock or a display change, see wake.rs).
+pub fn rebuild_overlays(app: &AppHandle) {
+    log::info!("rebuilding capture overlays");
+    let overlay_labels = || -> Vec<String> { app.webview_windows().into_keys().filter(|l| l.starts_with("overlay-")).collect() };
+    for label in overlay_labels() {
+        windows::close(app, &label);
+    }
+    // windows are destroyed asynchronously: wait, or `ensure_overlay` would
+    // pick up a dying window with the same label
+    for _ in 0..40 {
+        if overlay_labels().is_empty() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    prewarm_overlays(app);
+}
+
 fn ensure_overlay(app: &AppHandle, d: &Display) -> Result<tauri::WebviewWindow> {
     let label = overlay_label(d.id);
     if let Some(w) = app.get_webview_window(&label) {
@@ -95,17 +114,33 @@ fn ensure_overlay(app: &AppHandle, d: &Display) -> Result<tauri::WebviewWindow> 
     spec.resizable = false;
     spec.shadow = false;
     spec.visible = false;
-    Ok(windows::create(app, spec)?)
+    let w = windows::create(app, spec)?;
+    // A transparent window lets clicks on its fully transparent pixels fall
+    // through to the app behind, unless it explicitly takes mouse events
+    windows::set_ignore_mouse(app, &label, false);
+    macos::disable_animations(app, &w);
+    Ok(w)
 }
 
 pub fn is_active() -> bool {
     state::state().session.lock().is_some()
 }
 
+/// A capture is starting or waiting for a selection.
+pub fn is_busy() -> bool {
+    STARTING.load(Ordering::SeqCst) || is_active()
+}
+
+/// True between the shortcut and the session being ready (snapshots...).
+static STARTING: AtomicBool = AtomicBool::new(false);
+
 /// Begin an interactive capture.
 pub fn start(app: &AppHandle, mode: Mode, opts: StartOpts) {
     if state::state().recording.lock().is_some() && mode == Mode::Record {
         crate::recording::stop(app);
+        return;
+    }
+    if STARTING.load(Ordering::SeqCst) {
         return;
     }
     if is_active() {
@@ -116,20 +151,23 @@ pub fn start(app: &AppHandle, mode: Mode, opts: StartOpts) {
         crate::permissions::prompt_screen_recording(app);
         return;
     }
+    STARTING.store(true, Ordering::SeqCst);
     let app = app.clone();
     std::thread::spawn(move || {
-        if let Err(e) = start_inner(&app, mode, opts) {
+        let result = start_inner(&app, mode, opts);
+        STARTING.store(false, Ordering::SeqCst);
+        if let Err(e) = result {
             log::error!("capture start failed: {e:#}");
             crate::toast::show(&app, "error", "Capture failed", &format!("{e}"));
             *state::state().session.lock() = None;
-            crate::hotkeys::end_session_keys(&app, "overlay");
-            crate::quick_access::relayout(&app);
+            hide_overlays(&app);
         }
     });
 }
 
 fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
     log::info!("capture start {mode:?}");
+    let started = std::time::Instant::now();
     // Quick Access steps aside while selecting (comes back afterwards)
     windows::hide(app, crate::quick_access::LABEL);
     let s = settings();
@@ -139,6 +177,15 @@ fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
         crate::desktop::set_hidden(app, true);
         std::thread::sleep(Duration::from_millis(60));
     }
+    // Snapshot first, before any of our windows covers the screen: the apps
+    // behind keep their hover states and open menus in the frozen image
+    let disps = displays::list();
+    let snaps = snapshot_displays(app, &disps, s.pins_show_on_screenshots)?;
+    // then take the mouse right away; the overlays fill in once the session
+    // is ready (see `overlay_ready`)
+    show_shields(app, &disps);
+    log::info!("capture shields up after {} ms", started.elapsed().as_millis());
+
     let all_windows = sck::window_list();
     let window_title = front
         .as_ref()
@@ -146,27 +193,6 @@ fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
         .map(|w| w.title.clone())
         .unwrap_or_default();
     let pickable = sck::pickable_windows(&windows::capturable_own_windows(app, s.pins_show_on_screenshots));
-
-    let content = sck::shareable_content()?;
-    let exclude = windows::excluded_window_numbers(app, s.pins_show_on_screenshots);
-    let disps = displays::list();
-    let snaps: Vec<Snapshot> = std::thread::scope(|scope| {
-        let handles: Vec<_> = disps
-            .iter()
-            .map(|d| {
-                let content = &content;
-                let exclude = &exclude;
-                scope.spawn(move || {
-                    sck::capture_display(content, d, exclude, None, false, None)
-                        .map(|img| Snapshot { display: d.clone(), image: Arc::new(img), bmp: OnceCell::new() })
-                })
-            })
-            .collect();
-        handles.into_iter().filter_map(|h| h.join().ok().and_then(|r| r.ok())).collect()
-    });
-    if snaps.is_empty() {
-        return Err(anyhow!("Could not capture the screen. Check the Screen Recording permission."));
-    }
 
     let id = SESSION_IDS.fetch_add(1, Ordering::SeqCst);
     *state::state().session.lock() = Some(Session {
@@ -182,12 +208,62 @@ fn start_inner(app: &AppHandle, mode: Mode, opts: StartOpts) -> Result<()> {
 
     crate::hotkeys::session_keys(app, "overlay", crate::hotkeys::OVERLAY_KEYS);
     // Each overlay renders its fresh state, then calls `overlay_ready`,
-    // which orders it front (avoids flashing the previous session).
+    // which makes it visible (avoids flashing the previous session).
     for d in &disps {
         let w = ensure_overlay(app, d)?;
         let _ = w.emit_to(w.label(), "overlay:start", id);
     }
     Ok(())
+}
+
+/// Capture every display, excluding our own capture UI.
+fn snapshot_displays(app: &AppHandle, disps: &[Display], include_pins: bool) -> Result<Vec<Snapshot>> {
+    let content = sck::shareable_content()?;
+    let exclude = windows::excluded_window_numbers(app, include_pins);
+    let snaps: Vec<Snapshot> = std::thread::scope(|scope| {
+        let handles: Vec<_> = disps
+            .iter()
+            .map(|d| {
+                let content = &content;
+                let exclude = &exclude;
+                scope.spawn(move || {
+                    sck::capture_display(content, d, exclude, None, false, None)
+                        .map(|img| Snapshot { display: d.clone(), image: Arc::new(img), bmp: OnceCell::new() })
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .zip(disps)
+            .filter_map(|(h, d)| match h.join() {
+                Ok(Ok(snap)) => Some(snap),
+                // that display gets no overlay this time; say why
+                Ok(Err(e)) => {
+                    log::error!("snapshot of display {} failed: {e:#}", d.id);
+                    None
+                }
+                Err(_) => None,
+            })
+            .collect()
+    });
+    if snaps.is_empty() {
+        return Err(anyhow!("Could not capture the screen. Check the Screen Recording permission."));
+    }
+    Ok(snaps)
+}
+
+/// Put the overlays up as invisible "shields" that already take the mouse,
+/// and switch to the crosshair: the capture visibly starts at once, and
+/// clicks can't reach the app behind while the session loads.
+fn show_shields(app: &AppHandle, disps: &[Display]) {
+    for d in disps {
+        let Ok(w) = ensure_overlay(app, d) else { continue };
+        // nearly transparent rather than 0, which would let clicks through;
+        // the overlay may still show the previous session's last frame
+        windows::set_alpha(app, w.label(), 0.01);
+        windows::show(app, &w, false);
+    }
+    macos::set_crosshair_cursor(app);
 }
 
 #[derive(Serialize)]
@@ -612,6 +688,7 @@ pub fn overlay_ready(app: &AppHandle, display_id: u32, session_id: u64) {
     }
     let label = overlay_label(display_id);
     if let Some(w) = app.get_webview_window(&label) {
+        windows::set_alpha(app, &label, 1.0);
         windows::show(app, &w, false);
         let (mx, my) = macos::mouse_location();
         if displays::at_point(mx, my).id == display_id {

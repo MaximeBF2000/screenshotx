@@ -23,6 +23,12 @@ const CAMERA_CURSOR = `url("data:image/svg+xml;utf8,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M6 11a2 2 0 0 1 2-2h3l2-2.5h6L21 9h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z' fill='white' stroke='black' stroke-width='1.5' stroke-linejoin='round'/><circle cx='16' cy='16.5' r='4.2' fill='none' stroke='black' stroke-width='1.5'/></svg>",
 )}") 16 16, pointer`;
 
+/** Tell Rust this overlay rendered the session, so it can be made visible. */
+function markReady(sessionId: number) {
+  // (no rAF: hidden windows get no animation frames)
+  window.setTimeout(() => invoke("overlay_ready", { displayId, sessionId }), 20);
+}
+
 export default function Overlay() {
   const [p, setP] = useState<OverlayPayload | null>(null);
   const [imgReady, setImgReady] = useState(false);
@@ -37,6 +43,10 @@ export default function Overlay() {
   const imgRef = useRef<HTMLImageElement>(null);
   const drag = useRef<{ kind: "new" | "move" | Handle; sx: number; sy: number; orig: Rect | null; spaceBase?: { x: number; y: number } } | null>(null);
   const prevMode = useRef<Phase>("idle");
+  // The overlay takes the mouse as soon as the capture starts (Rust
+  // `show_shields`), before the session is loaded: a press in that gap
+  // starts the selection once it is
+  const earlyDown = useRef<{ x: number; y: number } | null>(null);
 
   const W = p?.display.width ?? window.innerWidth;
   const H = p?.display.height ?? window.innerHeight;
@@ -73,9 +83,16 @@ export default function Overlay() {
     document.documentElement.style.setProperty("--accent", payload.accent);
     setMouse(payload.mouse ? { x: payload.mouse[0], y: payload.mouse[1] } : null);
     const initial = payload.preset ?? payload.remember;
+    const early = earlyDown.current;
+    earlyDown.current = null;
     if (payload.mode === "window") {
       setPhase("window");
       setSel(null);
+    } else if (early) {
+      drag.current = { kind: "new", sx: early.x, sy: early.y, orig: null };
+      setSel({ x: early.x, y: early.y, w: 0, h: 0 });
+      setPhase("drag");
+      setHint(false);
     } else if (initial && (payload.mode === "allInOne" || payload.mode === "record" || payload.mode === "scrolling")) {
       setSel({ x: initial.x, y: initial.y, w: initial.w, h: initial.h });
       setPhase("adjust");
@@ -83,8 +100,9 @@ export default function Overlay() {
       setSel(null);
       setPhase("idle");
     }
-    // (no rAF: hidden windows get no animation frames)
-    window.setTimeout(() => invoke("overlay_ready", { displayId, sessionId: payload.sessionId }), 20);
+    // With Freeze screen, wait for the frozen image instead (`onLoad` below),
+    // so the screen never visibly changes underneath the overlay
+    if (!payload.freeze) markReady(payload.sessionId);
     // URL scheme: scrolling-capture?start=true with a preset area starts immediately
     if (payload.mode === "scrolling" && payload.preset && payload.settings.scrollingStart) {
       invoke("overlay_commit", {
@@ -220,7 +238,11 @@ export default function Overlay() {
 
   // ---------- pointer ----------
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!p || e.button !== 0) return;
+    if (e.button !== 0) return;
+    if (!p) {
+      earlyDown.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
     if ((e.target as HTMLElement).closest("[data-toolbar]")) return;
     setHint(false);
     const x = e.clientX;
@@ -307,6 +329,11 @@ export default function Overlay() {
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    if (!p) {
+      // released before the session loaded: just a click
+      earlyDown.current = null;
+      return;
+    }
     const d = drag.current;
     drag.current = null;
     if (!d || !p) return;
@@ -326,7 +353,7 @@ export default function Overlay() {
     else setPhase("adjust");
   };
 
-  if (!p) return <div className="fixed inset-0" />;
+  if (!p) return <div className="fixed inset-0" style={{ cursor: "crosshair" }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />;
 
   const showCross =
     (phase === "idle" || phase === "drag") &&
@@ -362,7 +389,11 @@ export default function Overlay() {
       <img
         ref={imgRef}
         src={p.imageUrl}
-        onLoad={() => setImgReady(true)}
+        onLoad={() => {
+          setImgReady(true);
+          if (p.freeze) markReady(p.sessionId);
+        }}
+        onError={() => p.freeze && markReady(p.sessionId)}
         draggable={false}
         className="absolute inset-0 w-full h-full pointer-events-none"
         style={{ opacity: p.freeze && imgReady ? 1 : 0, imageRendering: "auto" }}

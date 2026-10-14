@@ -233,3 +233,23 @@ button {
   background: #fff;
   box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
 }
+
+/* Quick Access: cards (or the tab) rise from the bottom edge */
+@keyframes qa-slide-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* scrollable without a visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

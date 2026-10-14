@@ -31,6 +31,7 @@ pub mod toast;
 pub mod tray;
 pub mod urlscheme;
 pub mod video;
+pub mod wake;
 pub mod windows;
 
 use tauri::http::{header, Response, StatusCode};
@@ -182,6 +183,7 @@ pub fn run() {
 
             // Warm up the windows that must appear instantly.
             capture::prewarm_overlays(&handle);
+            wake::observe(&handle);
             quick_access::prewarm(&handle);
 
             if !s.onboarding_done {
@@ -219,7 +221,7 @@ pub fn run() {
             commands::qa_close_all,
             commands::qa_save_all,
             commands::qa_restore,
-            commands::qa_hide_temporarily,
+            commands::qa_set_tucked,
             commands::toast_pending,
             commands::toast_hide,
             commands::toast_action,
@@ -271,7 +273,8 @@ pub fn run() {
             commands::video_open_editor,
             commands::scroll_control,
             commands::scroll_preview,
-            commands::qa_replace,
+            commands::annotate_edit_paths,
+            commands::annotate_keep,
             commands::ocr_ollama_status,
             commands::ocr_ollama_pull,
             commands::open_logs,

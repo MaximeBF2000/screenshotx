@@ -17,7 +17,7 @@ pub fn open(app: &AppHandle, path: &str, capture_id: Option<String>) {
         return;
     }
     let (iw, ih, scale) = if path.ends_with(".screenshotx") {
-        (1200.0, 800.0, 1.0)
+        project_size(path).map(|(w, h)| (w, h, 1.0)).unwrap_or((1200.0, 800.0, 1.0))
     } else {
         let dims = image::image_dimensions(path).map(|(w, h)| (w as f64, h as f64)).unwrap_or((1200.0, 800.0));
         let scale = if path.to_lowercase().ends_with(".png") { crate::imageops::png_scale(std::path::Path::new(path)) } else { 1.0 };
@@ -56,6 +56,13 @@ pub fn open(app: &AppHandle, path: &str, capture_id: Option<String>) {
             let _ = win.set_always_on_top(true);
         }
     }
+}
+
+/// Canvas size (points) of an Annotate project.
+fn project_size(path: &str) -> Option<(f64, f64)> {
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+    let canvas = &json["doc"]["canvas"];
+    Some((canvas["w"].as_f64()?, canvas["h"].as_f64()?))
 }
 
 pub fn open_blank(app: &AppHandle) {

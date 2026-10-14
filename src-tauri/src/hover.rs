@@ -41,7 +41,9 @@ pub fn track(app: &AppHandle, label: &str) {
                 if label == "quickaccess" {
                     // Space = Quick Look, Esc = close while hovering a thumbnail
                     match (prev.is_some(), pos.is_some()) {
-                        (false, true) => crate::hotkeys::session_keys(&app, "qa", &["Space", "Escape"]),
+                        (false, true) if !crate::quick_access::is_tucked() => {
+                            crate::hotkeys::session_keys(&app, "qa", &["Space", "Escape"])
+                        }
                         (true, false) => crate::hotkeys::end_session_keys(&app, "qa"),
                         _ => {}
                     }

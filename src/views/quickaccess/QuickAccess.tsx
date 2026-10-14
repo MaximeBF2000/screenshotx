@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
-import { Copy, Download, Eye, Film, Pencil, Pin, Scissors, Share, X } from "lucide-react";
+import { ChevronUp, Copy, Download, Eye, Film, Pencil, Pin, Scissors, Share, X } from "lucide-react";
 import clsx from "clsx";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { basename, fileUrl, formatBytes, formatDuration, invoke, listenHere, type CaptureItem } from "../../lib/ipc";
@@ -24,13 +24,15 @@ interface QaState {
   askName: boolean;
   showInfo: boolean;
   canRestore: boolean;
+  /** tucked away at the bottom edge: only a tab shows */
+  tucked: boolean;
 }
 
 const TIPS = [
   "Press Space to preview · Double-click to annotate",
   "Drag & drop thumbnails into any app",
   "Right-click a thumbnail for more actions",
-  "Swipe towards the edge to dismiss",
+  "Swipe towards the edge to dismiss · Swipe down to hide them all",
   "Use the pin to keep it on screen",
   "Closed one by mistake? Restore Last Capture",
 ];
@@ -45,6 +47,9 @@ export default function QuickAccess() {
   const focused = useRef<string | null>(null);
   const lastCount = useRef(0);
   const tipsShown = useSettings((s) => s.settings?.qaTipsShown ?? 0);
+  const list = useRef<HTMLDivElement>(null);
+  const [olderAbove, setOlderAbove] = useState(false);
+  const swipeDown = useSwipeDown(list, () => invoke("qa_set_tucked", { tucked: true }));
 
   // one quick tip per new capture, for the first few captures
   useEffect(() => {
@@ -91,7 +96,7 @@ export default function QuickAccess() {
   // keyboard shortcuts on the focused (last hovered) card; Space and Esc
   // also arrive as session keys while the cursor is over a thumbnail
   useKeys((e: KeyLike) => {
-    if ((e.target as HTMLElement | null)?.tagName === "INPUT") return;
+    if (st?.tucked || (e.target as HTMLElement | null)?.tagName === "INPUT") return;
     const id = hoverId ?? focused.current ?? st?.items[st.items.length - 1]?.id;
     if (!id) return;
     const item = st?.items.find((i) => i.id === id);
@@ -114,18 +119,26 @@ export default function QuickAccess() {
     }
   });
 
+  // the newest card (at the bottom) stays in view when the stack scrolls
+  const count = st?.items.length ?? 0;
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [count, st?.tucked]);
+
   if (!st) return null;
+  if (st.tucked) return <TuckedTab count={count} />;
   const { layout } = st;
   const multi = st.items.length > 1;
 
   return (
     <div
-      className="w-full h-full flex flex-col justify-end"
+      className="w-full h-full flex flex-col"
       style={{ paddingLeft: layout.sidePad, paddingRight: layout.sidePad }}
       onMouseEnter={() => setHoverStack(true)}
       onMouseLeave={() => setHoverStack(false)}
     >
-      <div className="flex items-end justify-center gap-2" style={{ height: layout.topBar, paddingBottom: 8, opacity: (multi && hoverStack) || tip ? 1 : 0, transition: "opacity .15s" }}>
+      <div className="shrink-0 flex items-end justify-center gap-2" style={{ height: layout.topBar, paddingBottom: 8, opacity: (multi && hoverStack) || tip ? 1 : 0, transition: "opacity .15s" }}>
         {tip && !(multi && hoverStack) && (
           <button onClick={() => setTip(null)} className="hud rounded-full px-3 h-7 text-[11.5px] font-medium max-w-full truncate" style={{ animation: "pop-in .2s ease-out" }} title="Click to dismiss">
             💡 {tip}
@@ -142,7 +155,22 @@ export default function QuickAccess() {
           </>
         )}
       </div>
-      <div className="flex flex-col" style={{ gap: layout.gap, paddingBottom: layout.gap }}>
+      {/* scrolls when the stack is taller than the screen; fades out at the
+          top while older cards are scrolled out of view */}
+      <div
+        ref={list}
+        className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col"
+        onScroll={(e) => setOlderAbove(e.currentTarget.scrollTop > 1)}
+        onWheel={swipeDown.onWheel}
+        style={{
+          maskImage: olderAbove ? "linear-gradient(to bottom, transparent, black 40px)" : undefined,
+          transform: `translateY(${swipeDown.pull}px)`,
+          opacity: 1 - Math.min(0.6, swipeDown.pull / 250),
+          transition: swipeDown.pull ? "none" : "transform .2s ease, opacity .2s ease",
+          animation: "qa-slide-up .25s ease-out",
+        }}
+      >
+        <div className="mt-auto flex flex-col" style={{ gap: layout.gap, paddingBottom: layout.gap }}>
         {st.items.map((item, i) => (
           <Card
             key={item.id}
@@ -155,7 +183,75 @@ export default function QuickAccess() {
             onFocus={() => (focused.current = item.id)}
           />
         ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** Pull distance (px) at which a swipe down tucks the stack away. */
+const TUCK_DISTANCE = 90;
+
+/** Whether a wheel event comes from fingers moving down on the trackpad
+ *  (deltaY's sign depends on the "Natural scrolling" setting). */
+function fingersDown(e: React.WheelEvent) {
+  const natural = (e.nativeEvent as WheelEvent & { webkitDirectionInvertedFromDevice?: boolean }).webkitDirectionInvertedFromDevice ?? true;
+  return natural ? e.deltaY < 0 : e.deltaY > 0;
+}
+
+/**
+ * Two-finger swipe down on the stack tucks it away (like CleanShot). When
+ * the stack scrolls, the swipe first scrolls it: it only counts once the
+ * stack can't scroll further that way, from the start of a new gesture
+ * (so momentum from browsing never hides it).
+ */
+function useSwipeDown(list: React.RefObject<HTMLDivElement | null>, onTuck: () => void) {
+  const [pull, setPull] = useState(0);
+  const g = useRef({ lastEvent: 0, armed: false, sum: 0, release: 0 });
+  const onWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // sideways: a card's dismiss swipe
+    const s = g.current;
+    const now = performance.now();
+    if (now - s.lastEvent > 300) {
+      const el = list.current;
+      const canScroll = !!el && (e.deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+      s.armed = !canScroll;
+      s.sum = 0;
+    }
+    s.lastEvent = now;
+    if (!s.armed || !fingersDown(e)) return;
+    s.sum += Math.abs(e.deltaY);
+    if (s.sum > TUCK_DISTANCE) {
+      s.armed = false;
+      setPull(0);
+      onTuck();
+      return;
+    }
+    setPull(s.sum);
+    // fingers lifted before the distance: spring back
+    window.clearTimeout(s.release);
+    s.release = window.setTimeout(() => setPull(0), 160);
+  };
+  return { pull, onWheel };
+}
+
+/** What's left of a tucked stack: click or swipe up to bring it back. */
+function TuckedTab({ count }: { count: number }) {
+  const show = () => invoke("qa_set_tucked", { tucked: false });
+  return (
+    <div className="w-full h-full flex items-end justify-center">
+      <button
+        title="Show Quick Access"
+        onClick={show}
+        onWheel={(e) => {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !fingersDown(e)) show();
+        }}
+        className="hud w-full h-[28px] rounded-t-[10px] flex items-center justify-center gap-1 text-[12px] font-semibold tabular-nums"
+        style={{ animation: "qa-slide-up .2s ease-out" }}
+      >
+        <ChevronUp size={15} strokeWidth={2.5} />
+        {count}
+      </button>
     </div>
   );
 }
@@ -271,7 +367,7 @@ function Card({
       { label: "Quick Look", accelerator: "Space", action: () => act(item.id, "quicklook") },
       { label: "Share...", action: () => act(item.id, "share", JSON.stringify([e.clientX, e.clientY])) },
       "separator" as const,
-      { label: "Hide Overlays Temporarily", action: () => invoke("qa_hide_temporarily") },
+      { label: "Hide Overlays", action: () => invoke("qa_set_tucked", { tucked: true }) },
       { label: "Close", action: () => dismiss() },
       { label: "Close All", enabled: st.items.length > 1, action: () => invoke("qa_close_all") },
       { label: "Save All", enabled: st.items.length > 1, action: () => invoke("qa_save_all") },

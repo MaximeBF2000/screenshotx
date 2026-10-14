@@ -26,7 +26,9 @@ Shortcuts**, or pick "Use macOS Shortcuts" during onboarding (⇧⌘3 fullscreen
 ### Other modes
 - **Capture Fullscreen**, **Capture Previous Area** and **Self-Timer** (countdown, interval set in Settings →
   Screenshots).
-- **Freeze screen**: freezes the screen while you select, to catch menus and tooltips.
+- **Freeze screen**: freezes the screen while you select. Hover states, open menus and tooltips stay as they
+  were when you pressed the shortcut, even if the app behind reacts to the mouse leaving it.
+- With several displays, keys (Space, Enter, Esc, arrows) act on the display under the mouse.
 - **Cursor**: optionally included in fullscreen, previous-area and self-timer captures.
 - **Hide Desktop Icons**: while capturing, or as a toggle from the menu.
 
@@ -62,11 +64,17 @@ screenshot, window, fullscreen, self-timer, scrolling, OCR, video or GIF.
 - It follows the active screen when you work on several displays, and hides while you select a new capture.
 - Hover buttons: **Copy** and **Save** in the middle; **Close**, **Preview** (Quick Look), **Edit** and **Pin**
   in the corners.
-- Drag a thumbnail into any app to drop the file. Swipe it away to close it. Double-click to edit.
+- Drag a thumbnail into any app to drop the file (the card stays, unless "Close after dragging" is on). Swipe
+  it towards the screen edge to close it. Double-click to edit.
+- A stack taller than the screen scrolls (the newest capture stays in view; the top fades while older ones are
+  above).
+- **Swipe down** with two fingers to tuck the stack away: a small tab with the number of captures stays at the
+  bottom edge. Click it or swipe up on it to bring the stack back; a new capture brings it back too. Also in
+  the right-click menu (Hide Overlays) and as the **Hide/Show Overlays** shortcut.
 - Keyboard while hovering a card: **Space** Quick Look, **⌘C** copy, **⌘S** save, **⌘P** pin, **Enter**
   edit, **Esc** / **⌫** / **⌘W** close.
 - Right-click menu: Save As, Rename, Show in Finder, Quick Look, rotate, flip, scale Retina to 1x, Close All,
-  Save All, Hide Temporarily, Move to Trash.
+  Save All, Hide Overlays, Move to Trash.
 - Auto-close (close, or save and close), ask for a name after each capture, file info on hover, and
   Restore Last Capture.
 
@@ -115,8 +123,10 @@ to grab and move one. The Text tool edits a text you click on.
 Saturation/brightness square, hue and opacity sliders, hex input, a screen eyedropper, presets and favorites.
 
 ### Output
-- **Save** (⌘S, ⌥⌘S keeps the window open), **Save As** (⇧⌘S: PNG, JPEG, HEIC, WebP, or an editable
-  `.screenshotx` project), **Copy** (⌘C with nothing selected).
+- **Save** (⌘S, ⌥⌘S keeps the window open): the edited image goes back to Quick Access, and its annotations stay
+  editable: **Edit** on the card reopens them. An image opened from disk is saved over its file instead.
+- **Save As** (⇧⌘S: PNG, JPEG, HEIC, WebP, or an editable `.screenshotx` project), **Copy** (⌘C with nothing
+  selected).
 - **Drag me**: drag the result into any app.
 - Share, Pin (⇧⌘P), Print (⌘P), and send to Quick Access.
 

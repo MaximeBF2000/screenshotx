@@ -6,7 +6,7 @@ use crate::settings::Settings;
 use crate::state::{self, settings, CaptureItem, CaptureKind};
 use crate::windows;
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
@@ -280,40 +280,15 @@ pub fn qa_restore(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn qa_hide_temporarily(app: AppHandle) {
-    crate::quick_access::hide_temporarily(&app, 10);
+pub fn qa_set_tucked(app: AppHandle, tucked: bool) {
+    crate::quick_access::set_tucked(&app, tucked);
 }
 
 pub fn add_file_to_quick_access(app: &AppHandle, path: &str) {
-    let p = Path::new(path);
-    if !p.exists() {
-        crate::toast::show(app, "error", "File not found", path);
-        return;
+    match crate::output::file_item(path) {
+        Some(item) => crate::quick_access::add(app, item),
+        None => crate::toast::show(app, "error", "File not found", path),
     }
-    let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-    let is_video = matches!(ext.as_str(), "mp4" | "mov" | "m4v");
-    let (w, h) = if is_video { (0, 0) } else { image::image_dimensions(p).unwrap_or((0, 0)) };
-    let thumb = if is_video {
-        crate::video::thumbnail(p).unwrap_or_default()
-    } else {
-        crate::imageops::load(p).map(|i| crate::output::make_image_thumb(&i, p)).unwrap_or_default()
-    };
-    let item = CaptureItem {
-        id: state::new_id(),
-        kind: if is_video { CaptureKind::Video } else if ext == "gif" { CaptureKind::Gif } else { CaptureKind::Screenshot },
-        path: path.to_string(),
-        width: w,
-        height: h,
-        scale: if ext == "png" { crate::imageops::png_scale(p) } else { 1.0 },
-        created: state::now_ms(),
-        size: std::fs::metadata(p).map(|m| m.len()).unwrap_or(0),
-        duration: if is_video { crate::video::duration(p) } else { None },
-        thumb,
-        saved: true,
-        app_name: String::new(),
-        ocr_text: None,
-    };
-    crate::quick_access::add(app, item);
 }
 
 // ---------------- toast ----------------
@@ -441,13 +416,7 @@ pub fn save_png_as(request: Request) -> CmdResult<String> {
                 Some("temp") => crate::paths::temp_dir(),
                 _ => crate::paths::captures_dir(),
             };
-            let ext = match format.as_str() {
-                "jpg" | "jpeg" => "jpg",
-                "heic" => "heic",
-                "webp" => "webp",
-                _ => "png",
-            };
-            crate::paths::unique_path(&dir, &stem, ext)
+            crate::paths::unique_path(&dir, &stem, crate::output::image_extension(&format))
         }
     };
     let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_else(|| "png".into());
@@ -747,9 +716,18 @@ pub fn scroll_preview() -> Option<(String, u32, u32, i64)> {
     crate::scrolling::last_preview()
 }
 
+/// Where Annotate's Save writes the edited image and its project:
+/// `(image, project)`, see `quick_access::edit_paths`.
 #[tauri::command]
-pub fn qa_replace(app: AppHandle, capture_id: String, path: String) {
-    crate::quick_access::replace_file(&app, &capture_id, &path);
+pub fn annotate_edit_paths(capture_id: Option<String>, stem: String) -> (PathBuf, PathBuf) {
+    crate::quick_access::edit_paths(capture_id.as_deref(), &stem)
+}
+
+/// Annotate's Save wrote both files: show the edit in Quick Access.
+/// Returns the card's id.
+#[tauri::command]
+pub fn annotate_keep(app: AppHandle, capture_id: Option<String>, path: String, project: String) -> Option<String> {
+    crate::quick_access::keep_edit(&app, capture_id.as_deref(), &path, Some(project))
 }
 
 /// Native screen color picker (eyedropper). Returns #RRGGBB or None.

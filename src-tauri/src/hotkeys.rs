@@ -51,7 +51,16 @@ pub const OVERLAY_KEYS: &[&str] = &[
 fn session_targets(app: &AppHandle, owner: &str) -> Vec<String> {
     use tauri::Manager;
     match owner {
-        "overlay" => app.webview_windows().keys().filter(|l| l.starts_with("overlay-")).cloned().collect(),
+        // only the overlay of the display under the mouse (the active one):
+        // otherwise every display would act on the same key at once
+        "overlay" => {
+            let active = crate::capture::overlay_label(crate::displays::under_mouse().id);
+            if app.get_webview_window(&active).is_some() {
+                vec![active]
+            } else {
+                app.webview_windows().keys().filter(|l| l.starts_with("overlay-")).cloned().collect()
+            }
+        }
         "scroll" => vec!["scrollprev".into()],
         "qa" => vec!["quickaccess".into()],
         other => vec![other.to_string()],

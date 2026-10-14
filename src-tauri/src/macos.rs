@@ -467,6 +467,23 @@ pub fn enable_background_cursor() {
     }
 }
 
+/// Show and hide a window instantly, without AppKit's zoom-in animation.
+pub fn disable_animations<R: Runtime>(app: &AppHandle, w: &WebviewWindow<R>) {
+    if let Some(nsw) = ns_window(w) {
+        let nsw = SendPtr(nsw);
+        on_main(app, move |_| {
+            let nsw = nsw;
+            nsw.0.setAnimationBehavior(objc2_app_kit::NSWindowAnimationBehavior::None);
+        });
+    }
+}
+
+/// Switch to the crosshair now, without waiting for the mouse to move over
+/// a web view (works while inactive thanks to `enable_background_cursor`).
+pub fn set_crosshair_cursor(app: &AppHandle) {
+    on_main(app, |_| objc2_app_kit::NSCursor::crosshairCursor().set());
+}
+
 /// Like `set_frame_cg`, with AppKit's window resize/move animation.
 pub fn animate_frame_cg<R: Runtime>(app: &AppHandle, w: &WebviewWindow<R>, x: f64, y: f64, width: f64, height: f64) {
     if let Some(nsw) = ns_window(w) {

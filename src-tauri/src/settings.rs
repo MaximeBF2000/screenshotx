@@ -272,7 +272,7 @@ impl Default for Settings {
             qa_auto_close: false,
             qa_auto_close_interval: 30,
             qa_auto_close_action: "close".into(),
-            qa_close_after_dragging: true,
+            qa_close_after_dragging: false,
             qa_show_file_info: true,
             qa_tips_shown: 0,
 

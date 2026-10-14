@@ -73,6 +73,20 @@ if (!isTauri && import.meta.env.DEV) {
     (window as any).__lastCommit = a.commit;
     console.info("commit", JSON.stringify(a.commit));
   });
+  // ?view=quickaccess&n=12 (number of cards), &tucked=1
+  registerMock("qa_state", () => ({
+    items: Array.from({ length: Number(params.get("n") ?? 3) }, (_, i) => ({
+      id: `c${i}`, kind: "screenshot", path: "/dev/sample.png", thumb: "", width: 1400, height: 900, scale: 1, created: 0, size: 40667, saved: false, appName: "",
+    })),
+    layout: { cardW: 228, cardH: 148, gap: 14, topBar: 44, sidePad: 22, side: "right" },
+    autoClose: false, autoCloseInterval: 10, askName: false, showInfo: false, canRestore: false,
+    tucked: params.get("tucked") === "1",
+  }));
+  registerMock("annotate_edit_paths", (a) => [`/Captures/${a.stem}.png`, `/Captures/${a.stem}.screenshotx`]);
+  registerMock("annotate_keep", (a) => {
+    (window as any).__kept = a;
+    return a.captureId ?? "card-1";
+  });
   registerMock("video_info", () => ({ duration: 4.2, width: 640, height: 400, size: 40667 }));
   registerMock("video_filmstrip", () => []);
   registerMock("media_devices", () => ({ microphones: [{ id: "m1", name: "MacBook Pro Microphone" }], cameras: [{ id: "c1", name: "FaceTime HD Camera" }] }));

@@ -41,7 +41,7 @@ pub const ACTIONS: &[ActionDef] = &[
     ActionDef { id: "restoreLast", label: "Restore Last Capture", group: "Other" },
     ActionDef { id: "openHistory", label: "Open Capture History", group: "Other" },
     ActionDef { id: "closeAllOverlays", label: "Close All Overlays", group: "Other" },
-    ActionDef { id: "hideOverlays", label: "Temporarily Hide Overlays", group: "Other" },
+    ActionDef { id: "hideOverlays", label: "Hide/Show Overlays", group: "Other" },
 ];
 
 pub fn label(id: &str) -> &'static str {
@@ -119,7 +119,7 @@ pub fn run_with(app: &AppHandle, id: &str, mut opts: StartOpts) {
         "openHistory" => crate::commands::open_history(app),
         "closeAllOverlays" => crate::quick_access::close_all(app),
         "saveAllOverlays" => crate::quick_access::save_all(app),
-        "hideOverlays" => crate::quick_access::hide_temporarily(app, 10),
+        "hideOverlays" => crate::quick_access::toggle_tucked(app),
         "openSettings" => crate::commands::open_settings(app, None),
         "about" => crate::commands::open_settings(app, Some("about".into())),
         "quit" => app.exit(0),

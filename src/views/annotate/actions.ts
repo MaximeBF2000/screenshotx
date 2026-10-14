@@ -44,26 +44,39 @@ function stemOf(p: string) {
   return basename(p).replace(/\.[^.]+$/, "");
 }
 
-/** ⌘S — save next to the export location (or overwrite an opened file). */
+/** An image opened from disk (not a capture) is saved over its file. */
+export function savesInPlace() {
+  return source.external && !source.project && !source.captureId && !!source.path;
+}
+
+/**
+ * ⌘S — overwrite an image opened from disk, or else hand the edit back to
+ * Quick Access: the card shows the edited image and keeps the annotations,
+ * so "Annotate" on the card reopens them editable.
+ */
 export async function save(opts: { close?: boolean; ask?: boolean } = {}) {
   const s = useSettings.getState().settings;
   const doc = useAnnotate.getState().doc!;
   const ask = opts.ask ?? s?.annotateSaveBehavior === "ask";
   if (ask) return saveAs();
-  let path: string;
-  const fmt = s?.screenshotFormat ?? "png";
-  if (source.external && !source.project && source.path) {
-    path = await savePng(await renderBytes(), { path: source.path, scale: doc.scale });
-  } else {
-    const stem = source.path && !source.project ? stemOf(source.path) : await invoke<string>("new_file_stem");
-    path = await savePng(await renderBytes(), { dir: "export", stem, scale: doc.scale, format: fmt });
-  }
+  const path = savesInPlace() ? await savePng(await renderBytes(), { path: source.path, scale: doc.scale }) : await keepInQuickAccess();
   useAnnotate.setState({ dirty: false });
-  // the Quick Access card (if still open) now shows the edited version
-  if (source.captureId) invoke("qa_replace", { captureId: source.captureId, path });
   if (opts.close !== false) {
     closeSelf();
   }
+  return path;
+}
+
+/** Write the edited image and its project, then show them in Quick Access. */
+async function keepInQuickAccess(): Promise<string> {
+  const doc = useAnnotate.getState().doc!;
+  const captureId = source.captureId || null;
+  const stem = source.path ? stemOf(source.path) : await invoke<string>("new_file_stem");
+  const [image, project] = await invoke<[string, string]>("annotate_edit_paths", { captureId, stem });
+  await saveProject(project);
+  const path = await savePng(await renderBytes(), { path: image, scale: doc.scale });
+  // the next Save (with the window kept open) updates the same card
+  source.captureId = (await invoke<string | null>("annotate_keep", { captureId, path, project })) ?? "";
   return path;
 }
 

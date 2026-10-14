@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
 import { useAnnotate, selectionBounds } from "./store";
 import { computeBalance, layout, measureText, renderDoc, textFont, isLight, type Env } from "./render";
 import { bounds, handles, norm, resizeBox, smoothPoints, snap45, topHit, translate, type HandleId } from "./geom";
@@ -15,7 +16,7 @@ type Drag =
 
 export function AnnotateCanvas() {
   const st = useAnnotate();
-  const { doc, zoom, tool, ts, selected, crop } = st;
+  const { doc, tool, ts, selected, crop } = st;
   const settings = useSettings((s) => s.settings);
   const viewport = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,8 +41,12 @@ export function AnnotateCanvas() {
     [st.images, st.imagesVersion, drawShadows, balance, st.editingText],
   );
   const L = doc ? layout(doc, env) : null;
+  // In fit mode the zoom follows the output size (which changes with the
+  // background padding / inset) in the same frame: going through the store
+  // first would draw one frame at the old zoom, overflowing with scrollbars
+  const zoom = st.fitMode && L ? fitZoom(L.outW, L.outH, vp) : st.zoom;
 
-  // viewport size → fit zoom
+  // viewport size (for the fit zoom)
   useLayoutEffect(() => {
     const el = viewport.current;
     if (!el) return;
@@ -50,15 +55,13 @@ export function AnnotateCanvas() {
     setVp({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
+  // keep the store's zoom (shown in the toolbar) in sync
   useEffect(() => {
-    if (!L || !st.fitMode) return;
-    const pad = 48;
-    const z = Math.min(1, (vp.w - pad * 2) / L.outW, (vp.h - pad * 2) / L.outH);
-    if (Math.abs(z - zoom) > 0.001) st.setZoom(z, true);
-  }, [L?.outW, L?.outH, vp.w, vp.h, st.fitMode]);
+    if (st.fitMode && Math.abs(zoom - st.zoom) > 0.001) st.setZoom(zoom, true);
+  }, [zoom, st.fitMode]);
 
-  // render
-  useEffect(() => {
+  // render before paint, so the canvas is never shown stretched to a new size
+  useLayoutEffect(() => {
     const c = canvasRef.current;
     if (!c || !doc || !L) return;
     const dpr = window.devicePixelRatio || 2;
@@ -441,11 +444,11 @@ export function AnnotateCanvas() {
   const cursor = space ? "grab" : tool === "move" ? "default" : tool === "text" ? "text" : "crosshair";
   const hoverObj = hoverId && !selected.includes(hoverId) ? doc.objects.find((o) => o.id === hoverId) : null;
 
-  const pad = Math.max(48, Math.max(0, (vp.w - L.outW * zoom) / 2));
-  const padY = Math.max(48, Math.max(0, (vp.h - L.outH * zoom) / 2));
+  const pad = Math.max(FIT_MARGIN, (vp.w - L.outW * zoom) / 2);
+  const padY = Math.max(FIT_MARGIN, (vp.h - L.outH * zoom) / 2);
 
   return (
-    <div ref={viewport} className="flex-1 overflow-auto relative" style={{ background: "var(--win-bg-2)" }}>
+    <div ref={viewport} className={clsx("flex-1 relative", st.fitMode ? "overflow-hidden" : "overflow-auto")} style={{ background: "var(--win-bg-2)" }}>
       <div style={{ width: L.outW * zoom + pad * 2, height: L.outH * zoom + padY * 2, position: "relative" }}>
         <div
           className="absolute"
@@ -645,4 +648,12 @@ function CropOverlay({
       </div>
     </>
   );
+}
+
+/** Margin around the image when it's zoomed to fit. */
+const FIT_MARGIN = 48;
+
+/** Zoom that fits a `w`×`h` output in the viewport (never above 100%). */
+function fitZoom(w: number, h: number, vp: { w: number; h: number }) {
+  return Math.max(0.05, Math.min(1, (vp.w - FIT_MARGIN * 2) / w, (vp.h - FIT_MARGIN * 2) / h));
 }

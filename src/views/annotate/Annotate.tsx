@@ -111,7 +111,7 @@ export default function Annotate() {
     actions.source.captureId = params.get("captureId") ?? "";
     actions.source.project = path.endsWith(".screenshotx");
     actions.source.external = !!path && params.get("internal") !== "1";
-    setTitle(path ? basename(path) : "Untitled");
+    setTitle(path ? basename(path).replace(/\.screenshotx$/, "") : "Untitled");
     buildDoc(path)
       .then(({ doc, images }) => {
         useAnnotate.getState().init(doc, images);
@@ -134,7 +134,10 @@ export default function Annotate() {
       tool: last.tool === "filledRect" ? "rect" : last.tool && last.tool !== "crop" ? last.tool : "arrow",
     });
     const presets = settings.backgroundPresets ?? [];
-    if (settings.annotateRememberBackgroundTool && last.bgOpen) {
+    if (actions.source.project) {
+      // a project keeps its own background
+      if (useAnnotate.getState().doc!.background.enabled) useAnnotate.setState({ bgPanel: true });
+    } else if (settings.annotateRememberBackgroundTool && last.bgOpen) {
       const p = presets.find((x: any) => x.id === last.bgPreset);
       const d = useAnnotate.getState().doc!;
       const bg = p ? { ...DEFAULT_BACKGROUND, ...p, enabled: true } : { ...d.background, ...(last.bg ?? {}), enabled: true };
@@ -470,7 +473,7 @@ export default function Annotate() {
             actions.saveAs();
           }}
           className="ml-1.5 h-[28px] px-3 rounded-[7px] text-[12.5px] font-semibold bg-[var(--accent)] text-white hover:brightness-110 flex items-center gap-1.5"
-          title="Save (⌘S) — ⌥-click to keep the window open, right-click for Save As"
+          title={`${actions.savesInPlace() ? "Save (⌘S)" : "Save to Quick Access (⌘S), annotations stay editable"} — ⌥-click to keep the window open, right-click for Save As`}
         >
           <Download size={13} /> Save
         </button>

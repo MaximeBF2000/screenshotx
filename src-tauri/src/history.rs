@@ -94,6 +94,7 @@ fn files_in_use(app: &AppHandle) -> HashSet<String> {
     for it in st.qa_items.lock().iter() {
         used.insert(it.path.clone());
         used.insert(it.thumb.clone());
+        used.extend(it.project.clone());
     }
     for p in st.pins.lock().iter() {
         used.insert(p.path.clone());
